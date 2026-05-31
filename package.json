@@ -1,0 +1,17 @@
+{
+    "name": "bobiverse-atlas",
+    "private": true,
+    "version": "0.1.0",
+    "type": "module",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "npm run dev --workspace @bobiverse/web --",
+        "build": "npm run build --workspace @bobiverse/web",
+        "lint": "npm run lint --workspace @bobiverse/web",
+        "typecheck": "npm run typecheck --workspace @bobiverse/web",
+        "check": "npm run lint && npm run typecheck && npm run build"
+    }
+}

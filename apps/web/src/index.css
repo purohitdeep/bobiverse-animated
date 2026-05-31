@@ -1,0 +1,66 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap");
+
+:root {
+  color: #e5f2fb;
+  background:
+    radial-gradient(circle at top, rgba(26, 81, 120, 0.38), transparent 35%),
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(242, 204, 102, 0.12),
+      transparent 18%
+    ),
+    linear-gradient(180deg, #030711 0%, #050b16 55%, #02050b 100%);
+  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 4vw, 4.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+h2 {
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+p,
+li,
+dd,
+dt,
+a,
+button,
+input {
+  font-family: "IBM Plex Mono", monospace;
+}
