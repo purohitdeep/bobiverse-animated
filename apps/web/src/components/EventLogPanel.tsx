@@ -14,10 +14,12 @@ export function EventLogPanel({ events, focalYear }: EventLogPanelProps) {
     <section className="event-log-panel">
       <div className="event-log-header">
         <div>
-          <p className="rail-label">Timeline events</p>
-          <h3 className="event-log-title">Narrative feed</h3>
+          <p className="rail-label">Evidence log</p>
+          <h3 className="event-log-title">Chronology dossier</h3>
         </div>
-        <strong className="event-log-meta">Up to {formatYear(focalYear)}</strong>
+        <strong className="event-log-meta">
+          Frame {formatYear(focalYear)}
+        </strong>
       </div>
       <ol className="event-log-list">
         {events.map((event) => (

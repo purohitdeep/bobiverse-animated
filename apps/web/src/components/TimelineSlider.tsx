@@ -26,7 +26,7 @@ export function TimelineSlider({
     <>
       <div className="timeline-header">
         <label className="rail-label" htmlFor="year-range">
-          Story frame year
+          Chronology position
         </label>
         <strong className="timeline-year">{formatYear(focalYear)}</strong>
       </div>
@@ -59,8 +59,8 @@ export function TimelineSlider({
         })}
       </div>
       <p className="slider-caption">
-        The visible timeline ends at {selectedScope.label} and filters events by
-        the selected reading boundary.
+        The current frontier ends at {selectedScope.label}. Events beyond that
+        point stay outside the atlas view.
       </p>
     </>
   );

@@ -1,21 +1,21 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap");
+@import "./design-system.css";
 
 :root {
-  color: #e5f2fb;
+  color: var(--color-text);
   background:
-    radial-gradient(circle at top, rgba(26, 81, 120, 0.38), transparent 35%),
+    radial-gradient(circle at top left, rgba(204, 150, 100, 0.28), transparent 32%),
     radial-gradient(
-      circle at 20% 20%,
-      rgba(242, 204, 102, 0.12),
-      transparent 18%
+      circle at 85% 10%,
+      rgba(114, 128, 95, 0.16),
+      transparent 24%
     ),
-    linear-gradient(180deg, #030711 0%, #050b16 55%, #02050b 100%);
-  font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+    linear-gradient(180deg, #f4ebde 0%, #ecdfcd 55%, #e4d3bc 100%);
+  font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -31,15 +31,24 @@ body,
 body {
   margin: 0;
   min-height: 100vh;
+  color: var(--color-text);
+  background:
+    linear-gradient(rgba(112, 82, 58, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 82, 58, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at top left, rgba(204, 150, 100, 0.24), transparent 34%),
+    linear-gradient(180deg, #f4ebde 0%, #ecdfcd 55%, #e4d3bc 100%);
+  background-size: 48px 48px, 48px 48px, auto, auto;
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -48,19 +57,29 @@ h1 {
   font-size: clamp(2.5rem, 4vw, 4.4rem);
   line-height: 0.98;
   letter-spacing: -0.05em;
+  font-family: var(--font-heading);
 }
 
 h2 {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   line-height: 1.1;
+  font-family: var(--font-heading);
+}
+
+h3 {
+  font-family: var(--font-heading);
 }
 
 p,
 li,
 dd,
 dt,
-a,
 button,
-input {
-  font-family: "IBM Plex Mono", monospace;
+input,
+select {
+  font-family: var(--font-body);
+}
+
+a {
+  color: var(--color-accent-strong);
 }

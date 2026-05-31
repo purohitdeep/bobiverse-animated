@@ -1,0 +1,41 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap");
+
+:root {
+  --font-heading: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  --font-meta: "IBM Plex Mono", monospace;
+
+  --color-page: #efe4d4;
+  --color-page-wash: #dcc8b1;
+  --color-surface: rgba(250, 244, 236, 0.92);
+  --color-surface-strong: #f3e6d4;
+  --color-surface-contrast: #1a120e;
+  --color-text: #2a1d15;
+  --color-text-muted: #6d5a4c;
+  --color-border: rgba(129, 92, 64, 0.28);
+  --color-accent: #b86b3e;
+  --color-accent-strong: #8f4a24;
+  --color-accent-soft: rgba(184, 107, 62, 0.14);
+  --color-support: #687a60;
+  --color-stage: #18110d;
+  --color-stage-glow: rgba(167, 103, 53, 0.28);
+  --color-stage-line: rgba(209, 136, 71, 0.5);
+  --color-stage-grid: rgba(125, 89, 63, 0.46);
+  --color-stage-grid-subtle: rgba(49, 31, 23, 0.92);
+
+  --space-2xs: 0.4rem;
+  --space-xs: 0.7rem;
+  --space-sm: 1rem;
+  --space-md: 1.4rem;
+  --space-lg: 2rem;
+  --space-xl: 2.75rem;
+
+  --radius-sm: 16px;
+  --radius-md: 24px;
+  --radius-lg: 34px;
+  --radius-pill: 999px;
+
+  --shadow-panel: 0 22px 48px rgba(79, 50, 27, 0.12);
+  --shadow-stage: 0 26px 72px rgba(28, 17, 11, 0.28);
+  --transition-base: 180ms ease;
+}

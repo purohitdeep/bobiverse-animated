@@ -2,6 +2,16 @@ import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import type { SceneStarNode } from "@bobiverse/simulation";
 
+const scenePalette = {
+  background: "#18110d",
+  fog: "#18110d",
+  sun: "#d1894f",
+  rim: "#8d9a76",
+  grid: "#6e4c37",
+  gridSubtle: "#281b15",
+  route: "#c97842",
+};
+
 interface StarfieldSceneProps {
   stars: SceneStarNode[];
   selectedStarId: string;
@@ -49,18 +59,22 @@ export function StarfieldScene({
 }: StarfieldSceneProps) {
   return (
     <Canvas camera={{ position: [3.6, 2.4, 6.4], fov: 42 }}>
-      <color attach="background" args={["#020611"]} />
-      <fog attach="fog" args={["#020611", 5, 12]} />
-      <ambientLight intensity={0.5} />
+      <color attach="background" args={[scenePalette.background]} />
+      <fog attach="fog" args={[scenePalette.fog, 5, 12]} />
+      <ambientLight intensity={0.62} />
       <pointLight
         position={[0, 0, 0]}
         intensity={30}
         distance={16}
-        color="#f8d58a"
+        color={scenePalette.sun}
       />
-      <directionalLight position={[4, 5, 3]} intensity={1.1} color="#8fdcff" />
+      <directionalLight
+        position={[4, 5, 3]}
+        intensity={1}
+        color={scenePalette.rim}
+      />
       <gridHelper
-        args={[12, 12, "#18435e", "#0a1827"]}
+        args={[12, 12, scenePalette.grid, scenePalette.gridSubtle]}
         position={[0, -1.4, 0]}
       />
       <Stars
@@ -81,10 +95,10 @@ export function StarfieldScene({
               [0, 0, 0],
               [star.position.x, star.position.y, star.position.z],
             ]}
-            color="#7eceff"
+            color={scenePalette.route}
             lineWidth={1}
             transparent
-            opacity={0.28}
+            opacity={0.32}
           />
         ))}
 

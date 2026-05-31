@@ -21,11 +21,11 @@ export function ScopeSelector({
 }: ScopeSelectorProps) {
   return (
     <>
-      <p className="rail-label">Reading scope</p>
-      <h2>Choose your progress</h2>
+      <p className="rail-label">Reading frontier</p>
+      <h2>Mark your stopping point</h2>
       <p>
-        Limit the atlas to the point you have reached, then scrub the year to
-        see what is visible inside that reading boundary.
+        Set the furthest chapter you have reached, then use the atlas as a
+        spoiler-safe narrative map inside that boundary.
       </p>
       <div className="scope-books" role="tablist" aria-label="Book selector">
         {books.map((book) => (
@@ -44,7 +44,7 @@ export function ScopeSelector({
         ))}
       </div>
       <label className="rail-label scope-label" htmlFor="chapter-scope-select">
-        Chapter boundary
+        Chapter cutoff
       </label>
       <select
         id="chapter-scope-select"
@@ -58,7 +58,7 @@ export function ScopeSelector({
           </option>
         ))}
       </select>
-      <p className="card-footnote">Active manifest: {manifestLabel}</p>
+      <p className="card-footnote">Manifest in play: {manifestLabel}</p>
     </>
   );
 }
