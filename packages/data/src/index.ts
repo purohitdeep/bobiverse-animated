@@ -13,6 +13,26 @@ import {
   type TimelineEvent,
 } from "@bobiverse/domain";
 
+function assertKnownSources(
+  label: string,
+  records: Array<{ id: string; sourceIds: string[] }>,
+  knownSourceIds: Set<string>,
+) {
+  for (const record of records) {
+    const unknownSourceIds = record.sourceIds.filter(
+      (sourceId) => !knownSourceIds.has(sourceId),
+    );
+
+    if (unknownSourceIds.length > 0) {
+      throw new Error(
+        `${label} ${record.id} references unknown source ids: ${unknownSourceIds.join(
+          ", ",
+        )}`,
+      );
+    }
+  }
+}
+
 const rawStarSystems = [
   {
     id: "sol",
@@ -22,6 +42,8 @@ const rawStarSystems = [
     distanceLy: 0,
     sourceType: "catalog",
     note: "Origin point for the interstellar neighborhood model.",
+    sourceIds: ["simbad-catalog"],
+    reviewStatus: "verified",
   },
   {
     id: "epsilon-eridani",
@@ -30,6 +52,8 @@ const rawStarSystems = [
     decDegrees: -9.46,
     distanceLy: 10.5,
     sourceType: "catalog",
+    sourceIds: ["simbad-catalog"],
+    reviewStatus: "verified",
   },
   {
     id: "delta-eridani",
@@ -38,6 +62,8 @@ const rawStarSystems = [
     decDegrees: -9.76,
     distanceLy: 29.5,
     sourceType: "catalog",
+    sourceIds: ["simbad-catalog"],
+    reviewStatus: "verified",
   },
   {
     id: "omicron2-eridani",
@@ -46,6 +72,8 @@ const rawStarSystems = [
     decDegrees: -7.65,
     distanceLy: 16.45,
     sourceType: "catalog",
+    sourceIds: ["simbad-catalog"],
+    reviewStatus: "verified",
   },
   {
     id: "alpha-centauri",
@@ -54,6 +82,8 @@ const rawStarSystems = [
     decDegrees: -60.83,
     distanceLy: 4.39,
     sourceType: "catalog",
+    sourceIds: ["simbad-catalog"],
+    reviewStatus: "verified",
   },
   {
     id: "82-eridani",
@@ -62,24 +92,78 @@ const rawStarSystems = [
     decDegrees: -43.07,
     distanceLy: 19.76,
     sourceType: "catalog",
+    sourceIds: ["simbad-catalog"],
+    reviewStatus: "verified",
   },
 ] satisfies StarSystem[];
 
 const rawKnowledgeSources = [
   {
+    id: "we-are-legion-novel",
+    label: "We Are Legion (We Are Bob)",
+    href: "https://www.goodreads.com/book/show/32109569-we-are-legion-we-are-bob",
+    type: "novel",
+    authority: "primary",
+    scope: "Book 1",
+    author: "Dennis E. Taylor",
+    publishedYear: 2016,
+    note: "Primary canon for Book 1 timeline facts.",
+  },
+  {
+    id: "for-we-are-many-novel",
+    label: "For We Are Many",
+    href: "https://www.goodreads.com/book/show/33395557-for-we-are-many",
+    type: "novel",
+    authority: "primary",
+    scope: "Book 2",
+    author: "Dennis E. Taylor",
+    publishedYear: 2017,
+    note: "Primary canon for Book 2 timeline facts.",
+  },
+  {
+    id: "all-these-worlds-novel",
+    label: "All These Worlds",
+    href: "https://www.goodreads.com/book/show/35506021-all-these-worlds",
+    type: "novel",
+    authority: "primary",
+    scope: "Book 3",
+    author: "Dennis E. Taylor",
+    publishedYear: 2017,
+    note: "Primary canon for Book 3 timeline facts.",
+  },
+  {
+    id: "simbad-catalog",
+    label: "SIMBAD Astronomical Database",
+    href: "https://simbad.cds.unistra.fr/simbad/",
+    type: "catalog",
+    authority: "reference",
+    note: "Reference catalog for local stellar coordinates used in the seed map.",
+  },
+  {
     id: "timeline-books-1-2",
     label: "Bobiverse Timeline Books 1-2",
     href: "https://pastebin.com/ZcKub4Fc",
+    type: "timeline-reference",
+    authority: "secondary",
+    scope: "Books 1-2",
+    note: "Secondary timeline summary used only as corroboration during curation.",
   },
   {
     id: "timeline-books-1-3",
     label: "Bobiverse Timeline Books 1-3",
     href: "https://pastebin.com/qwfY3PMU",
+    type: "timeline-reference",
+    authority: "secondary",
+    scope: "Books 1-3",
+    note: "Secondary timeline summary used only as corroboration during curation.",
   },
   {
     id: "bobiverse-wiki",
     label: "Bobiverse Wiki",
     href: "https://bobiverse.fandom.com/wiki/Bobiverse_Wiki",
+    type: "fandom",
+    authority: "secondary",
+    note: "Secondary discovery aid; not authoritative without primary-text review.",
   },
 ] satisfies KnowledgeSource[];
 
@@ -92,6 +176,8 @@ const rawBooks = [
     chapterCount: 61,
     timelineStartYear: 2133,
     timelineEndYear: 2188.9,
+    sourceIds: ["we-are-legion-novel"],
+    reviewStatus: "canonical",
   },
   {
     id: "for-we-are-many",
@@ -101,6 +187,8 @@ const rawBooks = [
     chapterCount: 77,
     timelineStartYear: 2167,
     timelineEndYear: 2221.5,
+    sourceIds: ["for-we-are-many-novel"],
+    reviewStatus: "canonical",
   },
   {
     id: "all-these-worlds",
@@ -110,6 +198,8 @@ const rawBooks = [
     chapterCount: 76,
     timelineStartYear: 2212,
     timelineEndYear: 2263.9,
+    sourceIds: ["all-these-worlds-novel"],
+    reviewStatus: "canonical",
   },
 ] satisfies Book[];
 
@@ -120,6 +210,10 @@ const rawChapterScopes = [
     chapter: 14,
     label: "Book 1 · Chapter 14",
     maxYear: 2144.6,
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Spoiler boundary is an atlas curation cutoff and still needs page-level verification.",
   },
   {
     id: "book-1-finale",
@@ -127,6 +221,10 @@ const rawChapterScopes = [
     chapter: 61,
     label: "Book 1 · Chapter 61",
     maxYear: 2188.9,
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Book finale cutoff is curated from timeline notes and requires primary-text verification.",
   },
   {
     id: "book-2-others-reveal",
@@ -134,6 +232,10 @@ const rawChapterScopes = [
     chapter: 39,
     label: "Book 2 · Chapter 39",
     maxYear: 2188.7,
+    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Chapter cutoff remains provisional until the novel pass confirms the year boundary.",
   },
   {
     id: "book-2-finale",
@@ -141,6 +243,10 @@ const rawChapterScopes = [
     chapter: 77,
     label: "Book 2 · Chapter 77",
     maxYear: 2221.5,
+    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Book finale cutoff remains provisional until the novel pass confirms the year boundary.",
   },
   {
     id: "book-3-bridget-replicated",
@@ -148,6 +254,10 @@ const rawChapterScopes = [
     chapter: 41,
     label: "Book 3 · Chapter 41",
     maxYear: 2220.8,
+    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Chapter cutoff remains provisional until the Book 3 source review is complete.",
   },
   {
     id: "book-3-finale",
@@ -155,6 +265,10 @@ const rawChapterScopes = [
     chapter: 76,
     label: "Book 3 · Chapter 76",
     maxYear: 2263.9,
+    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Book finale cutoff remains provisional until the Book 3 source review is complete.",
   },
 ] satisfies ChapterScope[];
 
@@ -176,6 +290,10 @@ const rawTimelineEvents = [
     chapterScopeId: "book-1-arrival-epsilon-eridani",
     starSystemId: "sol",
     bobIds: ["bob"],
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-2"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Seed event retained for UI development and must be verified against Book 1 before promotion.",
   },
   {
     id: "bob-launch",
@@ -186,6 +304,10 @@ const rawTimelineEvents = [
     chapterScopeId: "book-1-arrival-epsilon-eridani",
     starSystemId: "sol",
     bobIds: ["bob"],
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-2"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Seed event retained for UI development and must be verified against Book 1 before promotion.",
   },
   {
     id: "bob-arrives-epsilon-eridani",
@@ -196,6 +318,10 @@ const rawTimelineEvents = [
     chapterScopeId: "book-1-arrival-epsilon-eridani",
     starSystemId: "epsilon-eridani",
     bobIds: ["bob"],
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-2"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Arrival year is provisional until the primary-text review confirms the cutoff.",
   },
   {
     id: "first-bobmoot",
@@ -205,6 +331,10 @@ const rawTimelineEvents = [
     year: 2172.5,
     chapterScopeId: "book-1-finale",
     bobIds: ["bob", "bill", "riker"],
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Bobmoot timing is provisional until the primary-text review confirms the event year.",
   },
   {
     id: "poseidon-discovered",
@@ -214,6 +344,10 @@ const rawTimelineEvents = [
     year: 2170.9,
     chapterScopeId: "book-2-others-reveal",
     bobIds: ["mulder"],
+    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Poseidon discovery date currently relies on secondary summaries pending a Book 2 verification pass.",
   },
   {
     id: "others-discovered",
@@ -223,6 +357,10 @@ const rawTimelineEvents = [
     year: 2188.5,
     chapterScopeId: "book-2-others-reveal",
     bobIds: [],
+    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Threat emergence date is provisional until the Book 2 verification pass is complete.",
   },
   {
     id: "battle-delta-pavonis",
@@ -233,15 +371,24 @@ const rawTimelineEvents = [
     chapterScopeId: "book-2-finale",
     starSystemId: "delta-eridani",
     bobIds: [],
+    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Battle date is provisional until the primary-text review confirms the timeline placement.",
   },
   {
     id: "bridget-replicated",
     bookId: "all-these-worlds",
     type: "replicant-created",
-    label: "Bridget becomes a replicant, shifting the social fabric of the Bobs.",
+    label:
+      "Bridget becomes a replicant, shifting the social fabric of the Bobs.",
     year: 2220.8,
     chapterScopeId: "book-3-bridget-replicated",
     bobIds: ["bridget-r"],
+    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Replication timing remains provisional until the Book 3 verification pass is complete.",
   },
   {
     id: "battle-of-sol",
@@ -252,6 +399,10 @@ const rawTimelineEvents = [
     chapterScopeId: "book-3-finale",
     starSystemId: "sol",
     bobIds: [],
+    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Battle date remains provisional until the Book 3 verification pass is complete.",
   },
   {
     id: "bob-pilgrimage",
@@ -262,21 +413,41 @@ const rawTimelineEvents = [
     chapterScopeId: "book-3-finale",
     starSystemId: "sol",
     bobIds: ["bob"],
+    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Seed event retained for UI development and must be verified against Book 3 before promotion.",
   },
 ] satisfies TimelineEvent[];
+
+export const knowledgeSources = rawKnowledgeSources.map((source) =>
+  KnowledgeSourceSchema.parse(source),
+);
+
+const knownSourceIds = new Set(knowledgeSources.map((source) => source.id));
 
 export const seedStarSystems = rawStarSystems.map((star) =>
   StarSystemSchema.parse(star),
 );
-export const knowledgeSources = rawKnowledgeSources.map((source) =>
-  KnowledgeSourceSchema.parse(source),
-);
+assertKnownSources("star system", seedStarSystems, knownSourceIds);
+
 export const atlasBooks = rawBooks.map((book) => BookSchema.parse(book));
+assertKnownSources("book", atlasBooks, knownSourceIds);
+
 export const atlasChapterScopes = rawChapterScopes.map((scope) =>
   ChapterScopeSchema.parse(scope),
 );
+assertKnownSources("chapter scope", atlasChapterScopes, knownSourceIds);
+
 export const atlasSeriesManifest =
   SeriesManifestSchema.parse(rawSeriesManifest);
+assertKnownSources(
+  "series manifest",
+  [{ id: atlasSeriesManifest.id, sourceIds: atlasSeriesManifest.sourceIds }],
+  knownSourceIds,
+);
+
 export const atlasTimelineEvents = rawTimelineEvents.map((event) =>
   TimelineEventSchema.parse(event),
 );
+assertKnownSources("timeline event", atlasTimelineEvents, knownSourceIds);

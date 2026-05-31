@@ -1,6 +1,24 @@
 import { z } from "zod";
 
 export const SourceTypeSchema = z.enum(["catalog", "estimated"]);
+export const SourceAuthoritySchema = z.enum([
+  "primary",
+  "secondary",
+  "reference",
+]);
+export const KnowledgeSourceTypeSchema = z.enum([
+  "novel",
+  "timeline-reference",
+  "fandom",
+  "catalog",
+]);
+export const ReviewStatusSchema = z.enum([
+  "canonical",
+  "verified",
+  "pending-review",
+  "disputed",
+  "deprecated",
+]);
 export const EventTypeSchema = z.enum([
   "replicant-created",
   "departure",
@@ -10,6 +28,12 @@ export const EventTypeSchema = z.enum([
   "narrative",
 ]);
 
+const ProvenanceFields = {
+  sourceIds: z.array(z.string().min(1)).min(1),
+  reviewStatus: ReviewStatusSchema,
+  evidenceNote: z.string().min(1).optional(),
+};
+
 export const StarSystemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -18,12 +42,20 @@ export const StarSystemSchema = z.object({
   distanceLy: z.number().nonnegative(),
   sourceType: SourceTypeSchema,
   note: z.string().optional(),
+  ...ProvenanceFields,
 });
 
 export const KnowledgeSourceSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   href: z.string().url(),
+  type: KnowledgeSourceTypeSchema,
+  authority: SourceAuthoritySchema,
+  scope: z.string().min(1).optional(),
+  author: z.string().min(1).optional(),
+  publishedYear: z.number().int().positive().optional(),
+  accessedOn: z.string().min(1).optional(),
+  note: z.string().min(1).optional(),
 });
 
 export const BookSchema = z.object({
@@ -34,6 +66,7 @@ export const BookSchema = z.object({
   chapterCount: z.number().int().positive(),
   timelineStartYear: z.number(),
   timelineEndYear: z.number(),
+  ...ProvenanceFields,
 });
 
 export const ChapterScopeSchema = z.object({
@@ -42,6 +75,7 @@ export const ChapterScopeSchema = z.object({
   chapter: z.number().int().positive(),
   label: z.string().min(1),
   maxYear: z.number(),
+  ...ProvenanceFields,
 });
 
 export const BobInstanceSchema = z.object({
@@ -52,6 +86,7 @@ export const BobInstanceSchema = z.object({
   createdYear: z.number(),
   homeSystemId: z.string().min(1),
   parentId: z.string().min(1).optional(),
+  ...ProvenanceFields,
 });
 
 export const TravelSegmentSchema = z.object({
@@ -62,6 +97,7 @@ export const TravelSegmentSchema = z.object({
   toSystemId: z.string().min(1),
   departureYear: z.number(),
   arrivalYear: z.number(),
+  ...ProvenanceFields,
 });
 
 export const TimelineEventSchema = z.object({
@@ -73,6 +109,7 @@ export const TimelineEventSchema = z.object({
   chapterScopeId: z.string().min(1).optional(),
   starSystemId: z.string().min(1).optional(),
   bobIds: z.array(z.string().min(1)).default([]),
+  ...ProvenanceFields,
 });
 
 export const SeriesManifestSchema = z.object({
@@ -84,6 +121,9 @@ export const SeriesManifestSchema = z.object({
 });
 
 export type SourceType = z.infer<typeof SourceTypeSchema>;
+export type SourceAuthority = z.infer<typeof SourceAuthoritySchema>;
+export type KnowledgeSourceType = z.infer<typeof KnowledgeSourceTypeSchema>;
+export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
 export type EventType = z.infer<typeof EventTypeSchema>;
 export type StarSystem = z.infer<typeof StarSystemSchema>;
 export type KnowledgeSource = z.infer<typeof KnowledgeSourceSchema>;
