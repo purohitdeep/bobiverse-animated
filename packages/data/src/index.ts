@@ -9,6 +9,8 @@ import {
   type KnowledgeSource,
   type SeriesManifest,
   type StarSystem,
+  TimelineEventSchema,
+  type TimelineEvent,
 } from "@bobiverse/domain";
 
 const rawStarSystems = [
@@ -164,6 +166,105 @@ const rawSeriesManifest = {
   sourceIds: rawKnowledgeSources.map((source) => source.id),
 } satisfies SeriesManifest;
 
+const rawTimelineEvents = [
+  {
+    id: "bob-online",
+    bookId: "we-are-legion",
+    type: "narrative",
+    label: "Bob comes online as a replicant.",
+    year: 2133.5,
+    chapterScopeId: "book-1-arrival-epsilon-eridani",
+    starSystemId: "sol",
+    bobIds: ["bob"],
+  },
+  {
+    id: "bob-launch",
+    bookId: "we-are-legion",
+    type: "departure",
+    label: "Bob launches from Sol aboard HEAVEN-1.",
+    year: 2133.6,
+    chapterScopeId: "book-1-arrival-epsilon-eridani",
+    starSystemId: "sol",
+    bobIds: ["bob"],
+  },
+  {
+    id: "bob-arrives-epsilon-eridani",
+    bookId: "we-are-legion",
+    type: "arrival",
+    label: "Bob arrives at Epsilon Eridani and begins local expansion.",
+    year: 2144.6,
+    chapterScopeId: "book-1-arrival-epsilon-eridani",
+    starSystemId: "epsilon-eridani",
+    bobIds: ["bob"],
+  },
+  {
+    id: "first-bobmoot",
+    bookId: "we-are-legion",
+    type: "technology",
+    label: "The first Bobmoot formalizes a shared strategic network.",
+    year: 2172.5,
+    chapterScopeId: "book-1-finale",
+    bobIds: ["bob", "bill", "riker"],
+  },
+  {
+    id: "poseidon-discovered",
+    bookId: "for-we-are-many",
+    type: "narrative",
+    label: "Mulder discovers Poseidon, expanding the colonization map.",
+    year: 2170.9,
+    chapterScopeId: "book-2-others-reveal",
+    bobIds: ["mulder"],
+  },
+  {
+    id: "others-discovered",
+    bookId: "for-we-are-many",
+    type: "conflict",
+    label: "The Others become an explicit strategic threat.",
+    year: 2188.5,
+    chapterScopeId: "book-2-others-reveal",
+    bobIds: [],
+  },
+  {
+    id: "battle-delta-pavonis",
+    bookId: "for-we-are-many",
+    type: "conflict",
+    label: "The Battle of Delta Pavonis changes the balance with the Others.",
+    year: 2217.3,
+    chapterScopeId: "book-2-finale",
+    starSystemId: "delta-eridani",
+    bobIds: [],
+  },
+  {
+    id: "bridget-replicated",
+    bookId: "all-these-worlds",
+    type: "replicant-created",
+    label: "Bridget becomes a replicant, shifting the social fabric of the Bobs.",
+    year: 2220.8,
+    chapterScopeId: "book-3-bridget-replicated",
+    bobIds: ["bridget-r"],
+  },
+  {
+    id: "battle-of-sol",
+    bookId: "all-these-worlds",
+    type: "conflict",
+    label: "The Battle of Sol becomes the defining late-war confrontation.",
+    year: 2257.4,
+    chapterScopeId: "book-3-finale",
+    starSystemId: "sol",
+    bobIds: [],
+  },
+  {
+    id: "bob-pilgrimage",
+    bookId: "all-these-worlds",
+    type: "narrative",
+    label: "Bob returns to Earth, then leaves for the stars again.",
+    year: 2263.8,
+    chapterScopeId: "book-3-finale",
+    starSystemId: "sol",
+    bobIds: ["bob"],
+  },
+] satisfies TimelineEvent[];
+
 export const seedStarSystems = rawStarSystems.map((star) =>
   StarSystemSchema.parse(star),
 );
@@ -174,4 +275,8 @@ export const atlasBooks = rawBooks.map((book) => BookSchema.parse(book));
 export const atlasChapterScopes = rawChapterScopes.map((scope) =>
   ChapterScopeSchema.parse(scope),
 );
-export const atlasSeriesManifest = SeriesManifestSchema.parse(rawSeriesManifest);
+export const atlasSeriesManifest =
+  SeriesManifestSchema.parse(rawSeriesManifest);
+export const atlasTimelineEvents = rawTimelineEvents.map((event) =>
+  TimelineEventSchema.parse(event),
+);

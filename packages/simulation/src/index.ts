@@ -1,4 +1,10 @@
-import type { Book, ChapterScope, SeriesManifest, StarSystem } from "@bobiverse/domain";
+import type {
+  Book,
+  ChapterScope,
+  SeriesManifest,
+  StarSystem,
+  TimelineEvent,
+} from "@bobiverse/domain";
 
 export interface CartesianCoordinate {
   x: number;
@@ -15,6 +21,10 @@ export interface SceneStarNode extends StarSystem {
 export interface TimelineBounds {
   startYear: number;
   endYear: number;
+}
+
+export interface TimelineEventState extends TimelineEvent {
+  state: "past" | "active" | "future";
 }
 
 const STAR_COLORS = [
@@ -84,4 +94,87 @@ export function getTimelineBounds(
 export function getManifestBooks(books: Book[], manifest: SeriesManifest) {
   const includedBookIds = new Set(manifest.bookIds);
   return books.filter((book) => includedBookIds.has(book.id));
+}
+
+export function getManifestChapterScopes(
+  scopes: ChapterScope[],
+  manifest: SeriesManifest,
+) {
+  const includedScopeIds = new Set(manifest.chapterScopeIds);
+  return scopes.filter((scope) => includedScopeIds.has(scope.id));
+}
+
+export function getBookChapterScopes(scopes: ChapterScope[], bookId: string) {
+  return scopes
+    .filter((scope) => scope.bookId === bookId)
+    .sort((left, right) => left.chapter - right.chapter);
+}
+
+export function getChapterScopeById(
+  scopes: ChapterScope[],
+  chapterScopeId: string,
+) {
+  return scopes.find((scope) => scope.id === chapterScopeId) ?? null;
+}
+
+export function getBooksThroughSelection(books: Book[], selectedBookId: string) {
+  const selectedBook = books.find((book) => book.id === selectedBookId);
+  if (!selectedBook) {
+    return [];
+  }
+
+  return books
+    .filter((book) => book.order <= selectedBook.order)
+    .sort((left, right) => left.order - right.order);
+}
+
+export function getScopeTimelineBounds(
+  books: Book[],
+  selectedScope: ChapterScope,
+): TimelineBounds {
+  const includedBooks = getBooksThroughSelection(books, selectedScope.bookId);
+  const startYear = includedBooks.length
+    ? Math.min(...includedBooks.map((book) => book.timelineStartYear))
+    : selectedScope.maxYear;
+
+  return {
+    startYear,
+    endYear: selectedScope.maxYear,
+  };
+}
+
+export function clampYearToBounds(year: number, bounds: TimelineBounds) {
+  return Math.min(Math.max(year, bounds.startYear), bounds.endYear);
+}
+
+export function getScopedTimelineEvents(
+  events: TimelineEvent[],
+  books: Book[],
+  selectedBookId: string,
+  scopeMaxYear: number,
+  focalYear: number,
+): TimelineEventState[] {
+  const scopeBookIds = new Set(
+    getBooksThroughSelection(books, selectedBookId).map((book) => book.id),
+  );
+
+  const visibleEvents = events
+    .filter(
+      (event) => scopeBookIds.has(event.bookId) && event.year <= scopeMaxYear,
+    )
+    .sort((left, right) => left.year - right.year);
+
+  const activeIndex = visibleEvents.findLastIndex(
+    (event) => event.year <= focalYear,
+  );
+
+  return visibleEvents.map((event, index) => ({
+    ...event,
+    state:
+      index === activeIndex
+        ? "active"
+        : event.year <= focalYear
+          ? "past"
+          : "future",
+  }));
 }

@@ -2,32 +2,104 @@ import {
   atlasBooks,
   atlasChapterScopes,
   atlasSeriesManifest,
+  atlasTimelineEvents,
   seedStarSystems,
 } from "@bobiverse/data";
 import { PROJECT_NAME } from "@bobiverse/domain";
 import {
   buildSceneStarNodes,
+  clampYearToBounds,
+  getBookChapterScopes,
+  getChapterScopeById,
   getManifestBooks,
+  getManifestChapterScopes,
   getNeighborhoodSummary,
-  getTimelineBounds,
+  getScopeTimelineBounds,
+  getScopedTimelineEvents,
 } from "@bobiverse/simulation";
 import "./App.css";
+import { EventLogPanel } from "./components/EventLogPanel";
+import { ScopeSelector } from "./components/ScopeSelector";
 import { StarfieldScene } from "./components/StarfieldScene";
+import { TimelineSlider } from "./components/TimelineSlider";
 import { useStarMapStore } from "./store/useStarMapStore";
 
 function App() {
   const selectedStarId = useStarMapStore((state) => state.selectedStarId);
   const setSelectedStarId = useStarMapStore((state) => state.setSelectedStarId);
+  const selectedBookId = useStarMapStore((state) => state.selectedBookId);
+  const setSelectedBookId = useStarMapStore((state) => state.setSelectedBookId);
+  const selectedChapterScopeId = useStarMapStore(
+    (state) => state.selectedChapterScopeId,
+  );
+  const setSelectedChapterScopeId = useStarMapStore(
+    (state) => state.setSelectedChapterScopeId,
+  );
   const focalYear = useStarMapStore((state) => state.focalYear);
   const setFocalYear = useStarMapStore((state) => state.setFocalYear);
 
   const sceneStarNodes = buildSceneStarNodes(seedStarSystems);
   const summary = getNeighborhoodSummary(seedStarSystems);
   const manifestBooks = getManifestBooks(atlasBooks, atlasSeriesManifest);
-  const timelineBounds = getTimelineBounds(manifestBooks, atlasChapterScopes);
+  const manifestChapterScopes = getManifestChapterScopes(
+    atlasChapterScopes,
+    atlasSeriesManifest,
+  );
+  const selectedBookChapterScopes = getBookChapterScopes(
+    manifestChapterScopes,
+    selectedBookId,
+  );
+  const selectedScope =
+    getChapterScopeById(manifestChapterScopes, selectedChapterScopeId) ??
+    selectedBookChapterScopes.at(-1) ??
+    manifestChapterScopes.at(-1);
   const activeStar =
     sceneStarNodes.find((star) => star.id === selectedStarId) ??
     sceneStarNodes[0];
+
+  if (!selectedScope) {
+    return null;
+  }
+
+  const timelineBounds = getScopeTimelineBounds(manifestBooks, selectedScope);
+  const timelineEvents = getScopedTimelineEvents(
+    atlasTimelineEvents,
+    manifestBooks,
+    selectedScope.bookId,
+    selectedScope.maxYear,
+    focalYear,
+  );
+
+  function handleBookChange(bookId: string) {
+    const nextScopes = getBookChapterScopes(manifestChapterScopes, bookId);
+    const fallbackScope = nextScopes.at(-1);
+    if (!fallbackScope) {
+      return;
+    }
+
+    setSelectedBookId(bookId);
+    setSelectedChapterScopeId(fallbackScope.id);
+
+    const nextBounds = getScopeTimelineBounds(manifestBooks, fallbackScope);
+    setFocalYear(clampYearToBounds(focalYear, nextBounds));
+  }
+
+  function handleChapterScopeChange(scopeId: string) {
+    const nextScope = getChapterScopeById(manifestChapterScopes, scopeId);
+    if (!nextScope) {
+      return;
+    }
+
+    setSelectedBookId(nextScope.bookId);
+    setSelectedChapterScopeId(nextScope.id);
+
+    const nextBounds = getScopeTimelineBounds(manifestBooks, nextScope);
+    setFocalYear(clampYearToBounds(focalYear, nextBounds));
+  }
+
+  function handleYearChange(year: number) {
+    setFocalYear(clampYearToBounds(year, timelineBounds));
+  }
 
   return (
     <div className="app-shell">
@@ -60,16 +132,15 @@ function App() {
       <main className="layout-grid">
         <aside className="control-rail">
           <section className="rail-card">
-            <p className="rail-label">Atlas scope</p>
-            <h2>Scene, timeline, and content</h2>
-            <p>
-              The app is being built around validated content packages so new
-              books can be added through data and manifests instead of renderer
-              rewrites.
-            </p>
-            <p className="card-footnote">
-              Active manifest: {atlasSeriesManifest.label}
-            </p>
+            <ScopeSelector
+              books={manifestBooks}
+              chapterScopes={selectedBookChapterScopes}
+              selectedBookId={selectedScope.bookId}
+              selectedChapterScopeId={selectedScope.id}
+              manifestLabel={atlasSeriesManifest.label}
+              onBookChange={handleBookChange}
+              onChapterScopeChange={handleChapterScopeChange}
+            />
           </section>
 
           <section className="rail-card">
@@ -97,23 +168,13 @@ function App() {
           </section>
 
           <section className="rail-card">
-            <label className="rail-label" htmlFor="year-range">
-              Story frame year
-            </label>
-            <input
-              id="year-range"
-              type="range"
-              min={String(Math.floor(timelineBounds.startYear))}
-              max={String(Math.ceil(timelineBounds.endYear))}
-              step="1"
-              value={focalYear}
-              onChange={(event) => setFocalYear(Number(event.target.value))}
+            <TimelineSlider
+              focalYear={focalYear}
+              bounds={timelineBounds}
+              chapterScopes={selectedBookChapterScopes}
+              selectedScope={selectedScope}
+              onYearChange={handleYearChange}
             />
-            <p className="slider-caption">
-              Timeline state will be driven by reading scope, chapter cutoffs,
-              replicant events, and travel segments from the shared simulation
-              layer.
-            </p>
           </section>
 
           <section className="rail-card">
@@ -130,10 +191,12 @@ function App() {
           <section className="rail-card">
             <p className="rail-label">Timeline bounds</p>
             <ul className="content-list">
-              <li>{Math.floor(timelineBounds.startYear)} earliest visible year</li>
+              <li>
+                {Math.floor(timelineBounds.startYear)} earliest visible year
+              </li>
               <li>{Math.ceil(timelineBounds.endYear)} latest visible year</li>
-              <li>Canonical star systems</li>
-              <li>{atlasChapterScopes.length} validated chapter scopes</li>
+              <li>{timelineEvents.length} scope-visible events</li>
+              <li>{manifestChapterScopes.length} validated chapter scopes</li>
             </ul>
           </section>
         </aside>
@@ -167,6 +230,8 @@ function App() {
               onSelectStar={setSelectedStarId}
             />
           </div>
+
+          <EventLogPanel events={timelineEvents} focalYear={focalYear} />
         </section>
       </main>
     </div>
