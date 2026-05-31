@@ -1,8 +1,15 @@
-import { seedStarSystems } from "@bobiverse/data";
+import {
+  atlasBooks,
+  atlasChapterScopes,
+  atlasSeriesManifest,
+  seedStarSystems,
+} from "@bobiverse/data";
 import { PROJECT_NAME } from "@bobiverse/domain";
 import {
   buildSceneStarNodes,
+  getManifestBooks,
   getNeighborhoodSummary,
+  getTimelineBounds,
 } from "@bobiverse/simulation";
 import "./App.css";
 import { StarfieldScene } from "./components/StarfieldScene";
@@ -16,6 +23,8 @@ function App() {
 
   const sceneStarNodes = buildSceneStarNodes(seedStarSystems);
   const summary = getNeighborhoodSummary(seedStarSystems);
+  const manifestBooks = getManifestBooks(atlasBooks, atlasSeriesManifest);
+  const timelineBounds = getTimelineBounds(manifestBooks, atlasChapterScopes);
   const activeStar =
     sceneStarNodes.find((star) => star.id === selectedStarId) ??
     sceneStarNodes[0];
@@ -38,8 +47,8 @@ function App() {
             <strong>{summary.count}</strong>
           </div>
           <div>
-            <span>Farthest seed</span>
-            <strong>{summary.farthestStar}</strong>
+            <span>Books covered</span>
+            <strong>{manifestBooks.length}</strong>
           </div>
           <div>
             <span>Current focus year</span>
@@ -57,6 +66,9 @@ function App() {
               The app is being built around validated content packages so new
               books can be added through data and manifests instead of renderer
               rewrites.
+            </p>
+            <p className="card-footnote">
+              Active manifest: {atlasSeriesManifest.label}
             </p>
           </section>
 
@@ -91,8 +103,8 @@ function App() {
             <input
               id="year-range"
               type="range"
-              min="2133"
-              max="2263"
+              min={String(Math.floor(timelineBounds.startYear))}
+              max={String(Math.ceil(timelineBounds.endYear))}
               step="1"
               value={focalYear}
               onChange={(event) => setFocalYear(Number(event.target.value))}
@@ -107,10 +119,21 @@ function App() {
           <section className="rail-card">
             <p className="rail-label">Content model</p>
             <ul className="content-list">
-              <li>Books and chapter scopes</li>
+              {manifestBooks.map((book) => (
+                <li key={book.id}>
+                  {book.shortTitle} · {book.chapterCount} chapters
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="rail-card">
+            <p className="rail-label">Timeline bounds</p>
+            <ul className="content-list">
+              <li>{Math.floor(timelineBounds.startYear)} earliest visible year</li>
+              <li>{Math.ceil(timelineBounds.endYear)} latest visible year</li>
               <li>Canonical star systems</li>
-              <li>Bob instances and lineage</li>
-              <li>Travel segments and event timelines</li>
+              <li>{atlasChapterScopes.length} validated chapter scopes</li>
             </ul>
           </section>
         </aside>

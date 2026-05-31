@@ -1,4 +1,4 @@
-import type { StarSystem } from "@bobiverse/domain";
+import type { Book, ChapterScope, SeriesManifest, StarSystem } from "@bobiverse/domain";
 
 export interface CartesianCoordinate {
   x: number;
@@ -10,6 +10,11 @@ export interface SceneStarNode extends StarSystem {
   position: CartesianCoordinate;
   radius: number;
   color: string;
+}
+
+export interface TimelineBounds {
+  startYear: number;
+  endYear: number;
 }
 
 const STAR_COLORS = [
@@ -62,4 +67,21 @@ export function getNeighborhoodSummary(stars: StarSystem[]) {
     farthestStar: farthestStar?.name ?? "Unknown",
     spanLy: farthestStar?.distanceLy ?? 0,
   };
+}
+
+export function getTimelineBounds(
+  books: Book[],
+  scopes: ChapterScope[],
+): TimelineBounds {
+  const startYears = books.map((book) => book.timelineStartYear);
+  const endYears = scopes.map((scope) => scope.maxYear);
+  return {
+    startYear: Math.min(...startYears),
+    endYear: Math.max(...endYears),
+  };
+}
+
+export function getManifestBooks(books: Book[], manifest: SeriesManifest) {
+  const includedBookIds = new Set(manifest.bookIds);
+  return books.filter((book) => includedBookIds.has(book.id));
 }

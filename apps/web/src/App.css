@@ -41,6 +41,11 @@
   color: rgba(224, 237, 244, 0.76);
 }
 
+.card-footnote {
+  margin-top: 0.9rem;
+  color: rgba(243, 223, 154, 0.72);
+}
+
 .hero-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
