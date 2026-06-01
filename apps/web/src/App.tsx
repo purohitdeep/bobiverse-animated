@@ -70,11 +70,17 @@ function App() {
     selectedScope.maxYear,
     focalYear,
   );
+  const sourceById = new Map(
+    knowledgeSources.map((source) => [source.id, source]),
+  );
   const primarySourceCount = knowledgeSources.filter(
     (source) => source.authority === "primary",
   ).length;
   const pendingReviewCount = timelineEvents.filter(
     (event) => event.reviewStatus === "pending-review",
+  ).length;
+  const disputedEventCount = timelineEvents.filter(
+    (event) => event.reviewStatus === "disputed",
   ).length;
 
   function handleBookChange(bookId: string) {
@@ -216,7 +222,6 @@ function App() {
               onSelectStar={setSelectedStarId}
             />
           </div>
-
         </section>
 
         <aside className="evidence-column">
@@ -252,17 +257,29 @@ function App() {
             <ul className="content-list compact">
               <li>{selectedScope.label} current reading frontier</li>
               <li>
-                {Math.floor(timelineBounds.startYear)} to {Math.ceil(timelineBounds.endYear)} visible years
+                {Math.floor(timelineBounds.startYear)} to{" "}
+                {Math.ceil(timelineBounds.endYear)} visible years
               </li>
-              <li>{pendingReviewCount} visible events still pending source review</li>
-              <li>{manifestChapterScopes.length} curated chapter boundaries in scope</li>
+              <li>
+                {pendingReviewCount} visible events still pending source review
+              </li>
+              <li>{disputedEventCount} visible events currently disputed</li>
+              <li>
+                {manifestChapterScopes.length} curated chapter boundaries in
+                scope
+              </li>
             </ul>
             <p className="card-footnote">
-              Canon policy: books first, secondary sources only for discovery or corroboration.
+              Canon policy: books first, secondary sources only for discovery or
+              corroboration.
             </p>
           </section>
 
-          <EventLogPanel events={timelineEvents} focalYear={focalYear} />
+          <EventLogPanel
+            events={timelineEvents}
+            focalYear={focalYear}
+            sourceById={sourceById}
+          />
         </aside>
       </main>
     </div>
