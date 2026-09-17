@@ -3,9 +3,16 @@ import {
   formatContentAuditReport,
   runContentAudit,
 } from "./audit.ts";
+import {
+  assertAtlasHasNoErrors,
+  formatAtlasValidationReport,
+  validateAtlas,
+} from "./validate.ts";
 
-const report = runContentAudit();
+const auditReport = runContentAudit();
+console.log(formatContentAuditReport(auditReport));
+assertContentAuditHasNoErrors(auditReport);
 
-console.log(formatContentAuditReport(report));
-
-assertContentAuditHasNoErrors(report);
+const validationReport = validateAtlas();
+console.log(formatAtlasValidationReport(validationReport));
+assertAtlasHasNoErrors(validationReport);
