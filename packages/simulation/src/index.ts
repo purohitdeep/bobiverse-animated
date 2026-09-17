@@ -4,6 +4,8 @@ import type {
   SeriesManifest,
   StarSystem,
   TimelineEvent,
+  TravelSegment,
+  BobInstance,
 } from "@bobiverse/domain";
 
 export interface CartesianCoordinate {
@@ -219,4 +221,157 @@ export function getScopedTimelineEvents(
           ? "past"
           : "future",
   }));
+}
+
+export interface TravelSegmentState extends TravelSegment {
+  state: "pre-departure" | "in-transit" | "arrived";
+}
+
+/**
+ * Reader-scope-aware travel visibility. A segment is only visible once its
+ * book is inside the reading frontier. Reveal follows the reader's chapter
+ * boundary, not story chronology: a segment from a later chapter stays
+ * hidden at an earlier reading frontier even if its departure year is
+ * earlier than the selected scope's max year.
+ */
+export function getScopedTravelSegments(
+  segments: TravelSegment[],
+  books: Book[],
+  scopes: ChapterScope[],
+  selectedScope: ChapterScope,
+  focalYear: number,
+): TravelSegmentState[] {
+  const selectedBook = books.find((book) => book.id === selectedScope.bookId);
+  if (!selectedBook) {
+    return [];
+  }
+
+  const bookOrderById = new Map(books.map((book) => [book.id, book.order]));
+
+  const visibleSegments = segments.filter((segment) => {
+    const segmentBookOrder = bookOrderById.get(segment.bookId);
+    if (
+      segmentBookOrder === undefined ||
+      segmentBookOrder > selectedBook.order
+    ) {
+      return false;
+    }
+
+    // Travel segments are revealed through the chapter scope that covers
+    // their departure year. Segments no scope covers stay hidden until
+    // curated, matching the timeline event policy.
+    const segmentScopes = scopes
+      .filter((scope) => scope.bookId === segment.bookId)
+      .sort((left, right) => left.chapter - right.chapter);
+    const revealingScope = segmentScopes.find(
+      (scope) => scope.maxYear >= segment.departureYear,
+    );
+    if (!revealingScope) {
+      return false;
+    }
+
+    const revealingBookOrder = bookOrderById.get(revealingScope.bookId);
+    if (revealingBookOrder === undefined) {
+      return false;
+    }
+    if (revealingBookOrder < selectedBook.order) {
+      return true;
+    }
+
+    return revealingScope.chapter <= selectedScope.chapter;
+  });
+
+  return visibleSegments.map((segment) => {
+    if (focalYear < segment.departureYear) {
+      return { ...segment, state: "pre-departure" as const };
+    }
+    if (focalYear < segment.arrivalYear) {
+      return { ...segment, state: "in-transit" as const };
+    }
+    return { ...segment, state: "arrived" as const };
+  });
+}
+
+export interface BobInstanceState extends BobInstance {
+  state: "not-yet-replicated" | "present";
+  currentSystemId: string;
+}
+
+/**
+ * Deterministic replicant world state at a focal year, filtered through the
+ * reading frontier. A replicant appears once it has been created and its
+ * introduction is inside the reader's scope; its location resolves from
+ * visible travel segments (in transit or arrived), falling back to the
+ * home system. Segments that have not departed do not move anyone.
+ */
+export function getScopedBobInstances(
+  bobs: BobInstance[],
+  segments: TravelSegment[],
+  books: Book[],
+  scopes: ChapterScope[],
+  selectedScope: ChapterScope,
+  focalYear: number,
+): BobInstanceState[] {
+  const scopedSegments = getScopedTravelSegments(
+    segments,
+    books,
+    scopes,
+    selectedScope,
+    focalYear,
+  );
+
+  const latestSegmentByBobId = new Map<string, TravelSegmentState>();
+  for (const segment of scopedSegments) {
+    const existing = latestSegmentByBobId.get(segment.bobId);
+    if (!existing || existing.departureYear < segment.departureYear) {
+      latestSegmentByBobId.set(segment.bobId, segment);
+    }
+  }
+
+  const selectedBook = books.find((book) => book.id === selectedScope.bookId);
+  if (!selectedBook) {
+    return [];
+  }
+  const bookOrderById = new Map(books.map((book) => [book.id, book.order]));
+
+  return bobs
+    .filter((bob) => {
+      if (focalYear < bob.createdYear) {
+        return false;
+      }
+
+      const introducedOrder = bookOrderById.get(bob.introducedInBookId);
+      if (introducedOrder === undefined || introducedOrder > selectedBook.order) {
+        return false;
+      }
+
+      // The replicating chapter must be revealed before the identity is.
+      const introductionScopes = scopes
+        .filter((scope) => scope.bookId === bob.introducedInBookId)
+        .sort((left, right) => left.chapter - right.chapter);
+      const revealingScope = introductionScopes.find(
+        (scope) => scope.maxYear >= bob.createdYear,
+      );
+      if (!revealingScope) {
+        return false;
+      }
+      const revealingOrder = bookOrderById.get(revealingScope.bookId);
+      if (revealingOrder === undefined) {
+        return false;
+      }
+      return revealingOrder < selectedBook.order ||
+        revealingScope.chapter <= selectedScope.chapter;
+    })
+    .map((bob) => {
+      const segment = latestSegmentByBobId.get(bob.id);
+      let currentSystemId = bob.homeSystemId;
+      if (segment && segment.state === "arrived") {
+        currentSystemId = segment.toSystemId;
+      }
+      return {
+        ...bob,
+        state: "present" as const,
+        currentSystemId,
+      };
+    });
 }

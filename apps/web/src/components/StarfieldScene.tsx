@@ -1,6 +1,6 @@
 import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import type { SceneStarNode } from "@bobiverse/simulation";
+import type { SceneStarNode, TravelSegmentState } from "@bobiverse/simulation";
 
 const scenePalette = {
   background: "#18110d",
@@ -15,6 +15,7 @@ const scenePalette = {
 interface StarfieldSceneProps {
   stars: SceneStarNode[];
   selectedStarId: string;
+  travelSegments: TravelSegmentState[];
   onSelectStar: (starId: string) => void;
 }
 
@@ -55,8 +56,13 @@ function StarMarker({ star, isSelected, onSelectStar }: StarMarkerProps) {
 export function StarfieldScene({
   stars,
   selectedStarId,
+  travelSegments,
   onSelectStar,
 }: StarfieldSceneProps) {
+  const starPositionsById = new Map(
+    stars.map((star) => [star.id, star.position]),
+  );
+
   return (
     <Canvas camera={{ position: [3.6, 2.4, 6.4], fov: 42 }}>
       <color attach="background" args={[scenePalette.background]} />
@@ -101,6 +107,31 @@ export function StarfieldScene({
             opacity={0.32}
           />
         ))}
+
+      {travelSegments.map((segment) => {
+        const from = starPositionsById.get(segment.fromSystemId);
+        const to = starPositionsById.get(segment.toSystemId);
+        if (!from || !to) {
+          return null;
+        }
+
+        return (
+          <Line
+            key={segment.id}
+            points={[
+              [from.x, from.y, from.z],
+              [to.x, to.y, to.z],
+            ]}
+            color={scenePalette.route}
+            lineWidth={2}
+            transparent
+            opacity={segment.state === "arrived" ? 0.85 : 0.55}
+            dashed={segment.state === "in-transit"}
+            dashSize={0.08}
+            gapSize={0.05}
+          />
+        );
+      })}
 
       {stars.map((star) => (
         <StarMarker

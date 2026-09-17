@@ -1,9 +1,11 @@
 import type { Book, ChapterScope, StarSystem, TimelineEvent } from "@bobiverse/domain";
 import {
+  atlasBobInstances,
   atlasBooks,
   atlasChapterScopes,
   atlasSeriesManifest,
   atlasTimelineEvents,
+  atlasTravelSegments,
   knowledgeSources,
   seedStarSystems,
 } from "./index.ts";
@@ -23,6 +25,8 @@ export interface AtlasValidationReport {
     books: number;
     chapterScopes: number;
     events: number;
+    bobInstances: number;
+    travelSegments: number;
   };
 }
 
@@ -93,12 +97,15 @@ export function validateAtlas(): AtlasValidationReport {
   const starIds = new Set(seedStarSystems.map((star) => star.id));
   const bookIds = new Set(atlasBooks.map((book) => book.id));
   const scopeIds = new Set(atlasChapterScopes.map((scope) => scope.id));
+  const bobIds = new Set(atlasBobInstances.map((bob) => bob.id));
 
   collectDuplicateIds("knowledge source", knowledgeSources, findings);
   collectDuplicateIds("star system", seedStarSystems, findings);
   collectDuplicateIds("book", atlasBooks, findings);
   collectDuplicateIds("chapter scope", atlasChapterScopes, findings);
   collectDuplicateIds("timeline event", atlasTimelineEvents, findings);
+  collectDuplicateIds("bob instance", atlasBobInstances, findings);
+  collectDuplicateIds("travel segment", atlasTravelSegments, findings);
 
   const seenOrders = new Set<number>();
   for (const book of atlasBooks) {
@@ -156,14 +163,74 @@ export function validateAtlas(): AtlasValidationReport {
     ], findings);
 
     for (const bobId of event.bobIds) {
-      // A Bob instance collection does not exist yet (movement slice
-      // scope). Tracked as a pending-reference warning so identity links
-      // stay visible without failing the gate.
+      if (!bobIds.has(bobId)) {
+        addFinding(findings, {
+          severity: "error",
+          collection: "timeline event",
+          recordId: event.id,
+          message: `unknown bob instance reference: ${bobId} (field bobIds)`,
+        });
+      }
+    }
+  }
+
+  for (const bob of atlasBobInstances) {
+    collectReferenceFindings("bob instance", bob.id, [
+      {
+        field: "introducedInBookId",
+        referencedId: bob.introducedInBookId,
+        knownIds: bookIds,
+        referencedLabel: "book",
+      },
+      {
+        field: "homeSystemId",
+        referencedId: bob.homeSystemId,
+        knownIds: starIds,
+        referencedLabel: "star system",
+      },
+      {
+        field: "parentId",
+        referencedId: bob.parentId,
+        knownIds: bobIds,
+        referencedLabel: "bob instance",
+      },
+    ], findings);
+  }
+
+  for (const segment of atlasTravelSegments) {
+    collectReferenceFindings("travel segment", segment.id, [
+      {
+        field: "bobId",
+        referencedId: segment.bobId,
+        knownIds: bobIds,
+        referencedLabel: "bob instance",
+      },
+      {
+        field: "bookId",
+        referencedId: segment.bookId,
+        knownIds: bookIds,
+        referencedLabel: "book",
+      },
+      {
+        field: "fromSystemId",
+        referencedId: segment.fromSystemId,
+        knownIds: starIds,
+        referencedLabel: "star system",
+      },
+      {
+        field: "toSystemId",
+        referencedId: segment.toSystemId,
+        knownIds: starIds,
+        referencedLabel: "star system",
+      },
+    ], findings);
+
+    if (segment.departureYear > segment.arrivalYear) {
       addFinding(findings, {
-        severity: "warning",
-        collection: "timeline event",
-        recordId: event.id,
-        message: `bob instance reference is pending a Bob collection: ${bobId} (field bobIds)`,
+        severity: "error",
+        collection: "travel segment",
+        recordId: segment.id,
+        message: "departureYear is after arrivalYear",
       });
     }
   }
@@ -227,6 +294,8 @@ export function validateAtlas(): AtlasValidationReport {
       books: atlasBooks.length,
       chapterScopes: atlasChapterScopes.length,
       events: atlasTimelineEvents.length,
+      bobInstances: atlasBobInstances.length,
+      travelSegments: atlasTravelSegments.length,
     },
   };
 }

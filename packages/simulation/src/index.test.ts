@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type {
   Book,
+  BobInstance,
   ChapterScope,
   StarSystem,
   TimelineEvent,
+  TravelSegment,
 } from "@bobiverse/domain";
 import {
   clampYearToBounds,
+  getScopedBobInstances,
   getScopedTimelineEvents,
+  getScopedTravelSegments,
   getTimelineBounds,
   toCartesianCoordinate,
 } from "./index.ts";
@@ -63,6 +67,39 @@ function makeEvent(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
     label: "Test event",
     year: 2150,
     bobIds: [],
+    sourceIds: ["test-source"],
+    reviewStatus: "pending-review",
+    evidenceNote: "test fixture",
+    ...overrides,
+  };
+}
+
+function makeBob(overrides: Partial<BobInstance> = {}): BobInstance {
+  return {
+    id: "test-bob",
+    name: "Test Bob",
+    generation: 1,
+    introducedInBookId: "test-book",
+    createdYear: 2135,
+    homeSystemId: "test-star",
+    sourceIds: ["test-source"],
+    reviewStatus: "pending-review",
+    evidenceNote: "test fixture",
+    ...overrides,
+  };
+}
+
+function makeSegment(
+  overrides: Partial<TravelSegment> = {},
+): TravelSegment {
+  return {
+    id: "test-segment",
+    bobId: "test-bob",
+    bookId: "test-book",
+    fromSystemId: "test-star",
+    toSystemId: "target-star",
+    departureYear: 2140,
+    arrivalYear: 2150,
     sourceIds: ["test-source"],
     reviewStatus: "pending-review",
     evidenceNote: "test fixture",
@@ -230,5 +267,123 @@ describe("getScopedTimelineEvents", () => {
       2200,
     );
     expect(events.map((event) => event.id)).toEqual(["prior-book"]);
+  });
+});
+
+describe("getScopedTravelSegments", () => {
+  it("reports a segment as in transit between departure and arrival", () => {
+    const segments = getScopedTravelSegments(
+      [makeSegment()],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2145,
+    );
+    expect(segments.map((segment) => segment.state)).toEqual(["in-transit"]);
+  });
+
+  it("reports pre-departure before and arrived after the journey", () => {
+    const before = getScopedTravelSegments(
+      [makeSegment()],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2135,
+    );
+    const after = getScopedTravelSegments(
+      [makeSegment()],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2160,
+    );
+    expect(before.map((s) => s.state)).toEqual(["pre-departure"]);
+    expect(after.map((s) => s.state)).toEqual(["arrived"]);
+  });
+
+  it("hides segments whose book is outside the reading frontier", () => {
+    const segments = getScopedTravelSegments(
+      [makeSegment({ bookId: "later-book" })],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2200,
+    );
+    expect(segments).toHaveLength(0);
+  });
+
+  it("hides segments departing after the selected scope's max year", () => {
+    const segments = getScopedTravelSegments(
+      [makeSegment({ departureYear: 2190, arrivalYear: 2199 })],
+      [makeBook()],
+      [makeScope({ maxYear: 2180 })],
+      makeScope({ maxYear: 2180 }),
+      2180,
+    );
+    expect(segments).toHaveLength(0);
+  });
+});
+
+describe("getScopedBobInstances", () => {
+  it("hides a replicant created after the focal year", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob({ createdYear: 2160 })],
+      [],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2150,
+    );
+    expect(bobs).toHaveLength(0);
+  });
+
+  it("places a stationary replicant at its home system", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob()],
+      [],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2160,
+    );
+    expect(bobs.map((b) => [b.id, b.state, b.currentSystemId])).toEqual([
+      ["test-bob", "present", "test-star"],
+    ]);
+  });
+
+  it("moves a replicant to the destination once its journey has arrived", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob()],
+      [makeSegment()],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2160,
+    );
+    expect(bobs[0]?.currentSystemId).toBe("target-star");
+  });
+
+  it("keeps a replicant at home while its journey is in transit", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob()],
+      [makeSegment()],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2145,
+    );
+    expect(bobs[0]?.currentSystemId).toBe("test-star");
+  });
+
+  it("hides replicants introduced beyond the selected chapter scope", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob({ createdYear: 2190 })],
+      [],
+      [makeBook()],
+      [makeScope({ maxYear: 2180 })],
+      makeScope({ maxYear: 2180 }),
+      2200,
+    );
+    expect(bobs).toHaveLength(0);
   });
 });

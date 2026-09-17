@@ -1,8 +1,10 @@
 import {
+  atlasBobInstances,
   atlasBooks,
   atlasChapterScopes,
   atlasSeriesManifest,
   atlasTimelineEvents,
+  atlasTravelSegments,
   knowledgeSources,
   seedStarSystems,
 } from "@bobiverse/data";
@@ -16,7 +18,9 @@ import {
   getManifestChapterScopes,
   getNeighborhoodSummary,
   getScopeTimelineBounds,
+  getScopedBobInstances,
   getScopedTimelineEvents,
+  getScopedTravelSegments,
 } from "@bobiverse/simulation";
 import "./App.css";
 import { EventLogPanel } from "./components/EventLogPanel";
@@ -65,6 +69,21 @@ function App() {
   const timelineBounds = getScopeTimelineBounds(manifestBooks, selectedScope);
   const timelineEvents = getScopedTimelineEvents(
     atlasTimelineEvents,
+    manifestBooks,
+    manifestChapterScopes,
+    selectedScope,
+    focalYear,
+  );
+  const travelSegments = getScopedTravelSegments(
+    atlasTravelSegments,
+    manifestBooks,
+    manifestChapterScopes,
+    selectedScope,
+    focalYear,
+  );
+  const bobInstances = getScopedBobInstances(
+    atlasBobInstances,
+    atlasTravelSegments,
     manifestBooks,
     manifestChapterScopes,
     selectedScope,
@@ -221,6 +240,7 @@ function App() {
             <StarfieldScene
               stars={sceneStarNodes}
               selectedStarId={activeStar.id}
+              travelSegments={travelSegments}
               onSelectStar={setSelectedStarId}
             />
           </div>
@@ -275,6 +295,33 @@ function App() {
               Canon policy: books first, secondary sources only for discovery or
               corroboration.
             </p>
+          </section>
+
+          <section className="editorial-panel replicant-panel">
+            <div className="panel-heading">
+              <p className="rail-label">Replicant ledger</p>
+              <h2>Who is active in this frame</h2>
+            </div>
+            {bobInstances.length === 0 ? (
+              <p className="card-footnote">
+                No replicants are active at this reading frontier and focal
+                year.
+              </p>
+            ) : (
+              <ul className="content-list compact">
+                {bobInstances.map((bob) => {
+                  const locationStar = sceneStarNodes.find(
+                    (star) => star.id === bob.currentSystemId,
+                  );
+                  return (
+                    <li key={bob.id}>
+                      {bob.name} · generation {bob.generation} ·{" "}
+                      {locationStar?.name ?? bob.currentSystemId}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
 
           <EventLogPanel

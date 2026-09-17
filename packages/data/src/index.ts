@@ -1,14 +1,18 @@
 import {
   BookSchema,
+  BobInstanceSchema,
   ChapterScopeSchema,
   KnowledgeSourceSchema,
   SeriesManifestSchema,
   StarSystemSchema,
+  TravelSegmentSchema,
   type Book,
+  type BobInstance,
   type ChapterScope,
   type KnowledgeSource,
   type SeriesManifest,
   type StarSystem,
+  type TravelSegment,
   TimelineEventSchema,
   type TimelineEvent,
 } from "@bobiverse/domain";
@@ -478,3 +482,95 @@ export const atlasTimelineEvents = rawTimelineEvents.map((event) =>
   TimelineEventSchema.parse(event),
 );
 assertKnownSources("timeline event", atlasTimelineEvents, knownSourceIds);
+
+const rawBobInstances = [
+  {
+    id: "bob",
+    name: "Bob",
+    generation: 0,
+    introducedInBookId: "we-are-legion",
+    createdYear: 2133.5,
+    homeSystemId: "sol",
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-2"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Identity and origin retained for UI development pending the Book 1 primary-text review.",
+  },
+  {
+    id: "bill",
+    name: "Bill",
+    generation: 1,
+    introducedInBookId: "we-are-legion",
+    createdYear: 2144.6,
+    homeSystemId: "epsilon-eridani",
+    parentId: "bob",
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Identity, lineage, and replication date pending the Book 1 primary-text review.",
+  },
+  {
+    id: "riker",
+    name: "Riker",
+    generation: 1,
+    introducedInBookId: "we-are-legion",
+    createdYear: 2144.8,
+    homeSystemId: "delta-eridani",
+    parentId: "bob",
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Identity, lineage, and replication date pending the Book 1 primary-text review.",
+  },
+  {
+    id: "mulder",
+    name: "Mulder",
+    generation: 2,
+    introducedInBookId: "for-we-are-many",
+    createdYear: 2170.5,
+    homeSystemId: "82-eridani",
+    parentId: "bob",
+    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Identity and Poseidon discovery context pending the Book 2 primary-text review.",
+  },
+  {
+    id: "bridget-r",
+    name: "Bridget R",
+    generation: 1,
+    introducedInBookId: "all-these-worlds",
+    createdYear: 2220.8,
+    homeSystemId: "sol",
+    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Replication timing and origin pending the Book 3 primary-text review.",
+  },
+] satisfies BobInstance[];
+
+const rawTravelSegments = [
+  {
+    id: "bob-sol-to-epsilon-eridani",
+    bobId: "bob",
+    bookId: "we-are-legion",
+    fromSystemId: "sol",
+    toSystemId: "epsilon-eridani",
+    departureYear: 2133.6,
+    arrivalYear: 2144.6,
+    sourceIds: ["we-are-legion-novel", "timeline-books-1-2"],
+    reviewStatus: "pending-review",
+    evidenceNote:
+      "Seed route retained for movement UI development pending the Book 1 primary-text review.",
+  },
+] satisfies TravelSegment[];
+
+export const atlasBobInstances = rawBobInstances.map((bob) =>
+  BobInstanceSchema.parse(bob),
+);
+assertKnownSources("bob instance", atlasBobInstances, knownSourceIds);
+
+export const atlasTravelSegments = rawTravelSegments.map((segment) =>
+  TravelSegmentSchema.parse(segment),
+);
+assertKnownSources("travel segment", atlasTravelSegments, knownSourceIds);

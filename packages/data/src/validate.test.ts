@@ -11,14 +11,14 @@ describe("validateAtlas on seed content", () => {
     expect(report.findings.filter((f) => f.severity === "error")).toEqual([]);
   });
 
-  it("reports pending bob references as warnings", () => {
+  it("resolves every bob instance reference in events", () => {
     const report = validateAtlas();
-    const bobWarnings = report.findings.filter(
+    const unknownBobErrors = report.findings.filter(
       (f) =>
-        f.severity === "warning" &&
-        f.message.includes("bob instance reference is pending"),
+        f.severity === "error" &&
+        f.message.includes("unknown bob instance reference"),
     );
-    expect(bobWarnings.length).toBeGreaterThan(0);
+    expect(unknownBobErrors).toEqual([]);
   });
 
   it("counts all collections in the summary", () => {
@@ -29,6 +29,8 @@ describe("validateAtlas on seed content", () => {
       books: 3,
       chapterScopes: 6,
       events: 10,
+      bobInstances: 5,
+      travelSegments: 1,
     });
   });
 });
@@ -51,6 +53,8 @@ describe("assertAtlasHasNoErrors", () => {
           books: 0,
           chapterScopes: 0,
           events: 0,
+          bobInstances: 0,
+          travelSegments: 0,
         },
       }),
     ).toThrow(/probe/);
@@ -74,6 +78,8 @@ describe("formatAtlasValidationReport", () => {
         books: 0,
         chapterScopes: 0,
         events: 0,
+        bobInstances: 0,
+        travelSegments: 0,
       },
     });
     expect(text).toContain("probe-star");
@@ -89,6 +95,8 @@ describe("formatAtlasValidationReport", () => {
         books: 0,
         chapterScopes: 0,
         events: 0,
+        bobInstances: 0,
+        travelSegments: 0,
       },
     });
     expect(text).toContain("Findings: none");
