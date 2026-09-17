@@ -66,8 +66,8 @@ function App() {
   const timelineEvents = getScopedTimelineEvents(
     atlasTimelineEvents,
     manifestBooks,
-    selectedScope.bookId,
-    selectedScope.maxYear,
+    manifestChapterScopes,
+    selectedScope,
     focalYear,
   );
   const sourceById = new Map(
@@ -85,7 +85,9 @@ function App() {
 
   function handleBookChange(bookId: string) {
     const nextScopes = getBookChapterScopes(manifestChapterScopes, bookId);
-    const fallbackScope = nextScopes.at(-1);
+    // Select the book's first curated boundary so changing books never
+    // discloses its finale without the reader explicitly choosing it.
+    const fallbackScope = nextScopes[0];
     if (!fallbackScope) {
       return;
     }

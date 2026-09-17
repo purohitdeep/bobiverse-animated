@@ -13,8 +13,10 @@ interface StarMapState {
 
 export const useStarMapStore = create<StarMapState>((set) => ({
   selectedStarId: "sol",
-  selectedBookId: "all-these-worlds",
-  selectedChapterScopeId: "book-3-finale",
+  // Start at the first curated boundary of the first book so the default
+  // view cannot disclose late-story content.
+  selectedBookId: "we-are-legion",
+  selectedChapterScopeId: "book-1-arrival-epsilon-eridani",
   focalYear: 2133,
   setSelectedStarId: (selectedStarId) => set({ selectedStarId }),
   setSelectedBookId: (selectedBookId) => set({ selectedBookId }),

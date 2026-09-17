@@ -160,18 +160,50 @@ export function clampYearToBounds(year: number, bounds: TimelineBounds) {
 export function getScopedTimelineEvents(
   events: TimelineEvent[],
   books: Book[],
-  selectedBookId: string,
-  scopeMaxYear: number,
+  scopes: ChapterScope[],
+  selectedScope: ChapterScope,
   focalYear: number,
 ): TimelineEventState[] {
-  const scopeBookIds = new Set(
-    getBooksThroughSelection(books, selectedBookId).map((book) => book.id),
-  );
+  const selectedBook = books.find((book) => book.id === selectedScope.bookId);
+  if (!selectedBook) {
+    return [];
+  }
+
+  const bookOrderById = new Map(books.map((book) => [book.id, book.order]));
+  const scopeById = new Map(scopes.map((scope) => [scope.id, scope]));
 
   const visibleEvents = events
-    .filter(
-      (event) => scopeBookIds.has(event.bookId) && event.year <= scopeMaxYear,
-    )
+    .filter((event) => {
+      const eventBookOrder = bookOrderById.get(event.bookId);
+      if (eventBookOrder === undefined || eventBookOrder > selectedBook.order) {
+        return false;
+      }
+
+      // Unscoped events have no reveal boundary yet and stay hidden until
+      // they are curated with a chapter scope.
+      if (!event.chapterScopeId) {
+        return false;
+      }
+
+      const eventScope = scopeById.get(event.chapterScopeId);
+      if (!eventScope) {
+        return false;
+      }
+
+      const eventScopeBookOrder = bookOrderById.get(eventScope.bookId);
+      if (eventScopeBookOrder === undefined) {
+        return false;
+      }
+
+      // Revealed in an earlier book: inside the reading frontier.
+      if (eventScopeBookOrder < selectedBook.order) {
+        return true;
+      }
+
+      // Same book: revealed at or before the selected chapter boundary.
+      return eventScope.chapter <= selectedScope.chapter;
+    })
+    .filter((event) => event.year <= selectedScope.maxYear)
     .sort((left, right) => left.year - right.year);
 
   const activeIndex = visibleEvents.findLastIndex(

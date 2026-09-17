@@ -128,12 +128,12 @@ describe("getScopedTimelineEvents", () => {
   it("marks the most recent event at or before the focal year as active", () => {
     const events = getScopedTimelineEvents(
       [
-        makeEvent({ id: "early", year: 2140 }),
-        makeEvent({ id: "late", year: 2160 }),
+        makeEvent({ id: "early", year: 2140, chapterScopeId: "test-scope" }),
+        makeEvent({ id: "late", year: 2160, chapterScopeId: "test-scope" }),
       ],
       [makeBook()],
-      "test-book",
-      2200,
+      [makeScope()],
+      makeScope(),
       2150,
     );
     expect(events.map((event) => event.state)).toEqual(["active", "future"]);
@@ -143,8 +143,8 @@ describe("getScopedTimelineEvents", () => {
     const events = getScopedTimelineEvents(
       [makeEvent({ id: "beyond", year: 2190 })],
       [makeBook()],
-      "test-book",
-      2180,
+      [makeScope()],
+      makeScope(),
       2200,
     );
     expect(events).toHaveLength(0);
@@ -154,10 +154,81 @@ describe("getScopedTimelineEvents", () => {
     const events = getScopedTimelineEvents(
       [makeEvent({ id: "other-book", bookId: "later-book" })],
       [makeBook()],
-      "test-book",
-      2200,
+      [makeScope()],
+      makeScope(),
       2200,
     );
     expect(events).toHaveLength(0);
+  });
+
+  it("hides a later-chapter event with an earlier year at an earlier scope", () => {
+    const events = getScopedTimelineEvents(
+      [
+        makeEvent({
+          id: "spoiler",
+          year: 2110,
+          chapterScopeId: "scope-finale",
+        }),
+      ],
+      [makeBook()],
+      [
+        makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+        makeScope({ id: "scope-finale", chapter: 10, maxYear: 2200 }),
+      ],
+      makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+      2120,
+    );
+    expect(events).toHaveLength(0);
+  });
+
+  it("shows a same-book event once its chapter scope is reached", () => {
+    const events = getScopedTimelineEvents(
+      [
+        makeEvent({
+          id: "revealed",
+          year: 2110,
+          chapterScopeId: "scope-finale",
+        }),
+      ],
+      [makeBook()],
+      [
+        makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+        makeScope({ id: "scope-finale", chapter: 10, maxYear: 2200 }),
+      ],
+      makeScope({ id: "scope-finale", chapter: 10, maxYear: 2200 }),
+      2200,
+    );
+    expect(events.map((event) => event.id)).toEqual(["revealed"]);
+  });
+
+  it("hides events that carry no chapter scope until they are curated", () => {
+    const events = getScopedTimelineEvents(
+      [makeEvent({ id: "unscoped", chapterScopeId: undefined })],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2200,
+    );
+    expect(events).toHaveLength(0);
+  });
+
+  it("shows events from an earlier book regardless of their chapter", () => {
+    const events = getScopedTimelineEvents(
+      [
+        makeEvent({
+          id: "prior-book",
+          bookId: "earlier-book",
+          chapterScopeId: "earlier-scope",
+        }),
+      ],
+      [makeBook({ id: "earlier-book", order: 1 }), makeBook({ order: 2 })],
+      [
+        makeScope({ id: "earlier-scope", bookId: "earlier-book", chapter: 5 }),
+        makeScope(),
+      ],
+      makeScope(),
+      2200,
+    );
+    expect(events.map((event) => event.id)).toEqual(["prior-book"]);
   });
 });
