@@ -20,7 +20,7 @@ interface AuditableRecord {
   id: string;
   sourceIds: string[];
   reviewStatus: ReviewStatus;
-  evidenceNote?: string;
+  evidenceNote?: string | undefined;
 }
 
 interface AuditCollection<TRecord extends AuditableRecord> {

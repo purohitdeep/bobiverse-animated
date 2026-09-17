@@ -27,7 +27,14 @@ export interface TimelineEventState extends TimelineEvent {
   state: "past" | "active" | "future";
 }
 
-const STAR_COLORS = [
+const STAR_COLORS: readonly [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+] = [
   "#f7d06b",
   "#79d8ff",
   "#88f0b5",
@@ -62,7 +69,7 @@ export function buildSceneStarNodes(
         z: base.y * scale,
       },
       radius: star.id === "sol" ? 0.22 : 0.12,
-      color: STAR_COLORS[index % STAR_COLORS.length],
+      color: STAR_COLORS[index % STAR_COLORS.length] ?? "#f7d06b",
     };
   });
 }

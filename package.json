@@ -10,8 +10,8 @@
     "scripts": {
         "dev": "npm run dev --workspace @bobiverse/web --",
         "build": "npm run build --workspace @bobiverse/web",
-        "lint": "npm run lint --workspace @bobiverse/web",
-        "typecheck": "npm run typecheck --workspace @bobiverse/web",
+        "lint": "npm run lint --workspaces --if-present",
+        "typecheck": "npm run typecheck --workspaces --if-present",
         "audit:content": "npm run audit --workspace @bobiverse/data",
         "check": "npm run lint && npm run typecheck && npm run audit:content && npm run build"
     }

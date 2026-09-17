@@ -4,6 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "typecheck": "tsc -p tsconfig.json --noEmit",
         "audit": "node --experimental-strip-types src/audit.cli.ts"
     },
     "exports": {
