@@ -117,7 +117,10 @@ export function getChapterScopeById(
   return scopes.find((scope) => scope.id === chapterScopeId) ?? null;
 }
 
-export function getBooksThroughSelection(books: Book[], selectedBookId: string) {
+export function getBooksThroughSelection(
+  books: Book[],
+  selectedBookId: string,
+) {
   const selectedBook = books.find((book) => book.id === selectedBookId);
   if (!selectedBook) {
     return [];

@@ -37,7 +37,9 @@ export function EventLogPanel({
             <span className="event-log-year">{formatYear(event.year)}</span>
             <div>
               <div className="event-log-topline">
-                <p className="event-log-type">{event.type.replace(/-/g, " ")}</p>
+                <p className="event-log-type">
+                  {event.type.replace(/-/g, " ")}
+                </p>
                 <span
                   className={`status-badge ${event.reviewStatus}`}
                   aria-label={`Review status ${formatReviewStatus(event.reviewStatus)}`}

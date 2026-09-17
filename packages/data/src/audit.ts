@@ -65,7 +65,10 @@ function createEmptyStatusCounts(): Record<ReviewStatus, number> {
   };
 }
 
-function createEmptyAuthorityCounts(): Record<KnowledgeSource["authority"], number> {
+function createEmptyAuthorityCounts(): Record<
+  KnowledgeSource["authority"],
+  number
+> {
   return {
     primary: 0,
     secondary: 0,
@@ -187,7 +190,9 @@ function auditCollection<TRecord extends AuditableRecord>(
 }
 
 export function runContentAudit(): ContentAuditReport {
-  const sourceById = new Map(knowledgeSources.map((source) => [source.id, source]));
+  const sourceById = new Map(
+    knowledgeSources.map((source) => [source.id, source]),
+  );
   const summary: ContentAuditSummary = {
     sourceCount: knowledgeSources.length,
     recordCount: 0,
@@ -200,7 +205,9 @@ export function runContentAudit(): ContentAuditReport {
   }
 
   const findings: ContentAuditFinding[] = [];
-  const collections: Array<AuditCollection<Book | ChapterScope | StarSystem | TimelineEvent>> = [
+  const collections: Array<
+    AuditCollection<Book | ChapterScope | StarSystem | TimelineEvent>
+  > = [
     { label: "star system", records: seedStarSystems },
     { label: "book", records: atlasBooks },
     { label: "chapter scope", records: atlasChapterScopes },
@@ -260,7 +267,9 @@ function formatFinding(finding: ContentAuditFinding) {
 }
 
 export function assertContentAuditHasNoErrors(report: ContentAuditReport) {
-  const errors = report.findings.filter((finding) => finding.severity === "error");
+  const errors = report.findings.filter(
+    (finding) => finding.severity === "error",
+  );
   if (errors.length > 0) {
     throw new Error(formatContentAuditReport(report));
   }

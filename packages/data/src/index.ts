@@ -344,7 +344,11 @@ const rawTimelineEvents = [
     year: 2170.9,
     chapterScopeId: "book-2-others-reveal",
     bobIds: ["mulder"],
-    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    sourceIds: [
+      "for-we-are-many-novel",
+      "timeline-books-1-3",
+      "bobiverse-wiki",
+    ],
     reviewStatus: "pending-review",
     evidenceNote:
       "Poseidon discovery date currently relies on secondary summaries pending a Book 2 verification pass.",
@@ -357,7 +361,11 @@ const rawTimelineEvents = [
     year: 2188.5,
     chapterScopeId: "book-2-others-reveal",
     bobIds: [],
-    sourceIds: ["for-we-are-many-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    sourceIds: [
+      "for-we-are-many-novel",
+      "timeline-books-1-3",
+      "bobiverse-wiki",
+    ],
     reviewStatus: "pending-review",
     evidenceNote:
       "Threat emergence date is provisional until the Book 2 verification pass is complete.",
@@ -385,7 +393,11 @@ const rawTimelineEvents = [
     year: 2220.8,
     chapterScopeId: "book-3-bridget-replicated",
     bobIds: ["bridget-r"],
-    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    sourceIds: [
+      "all-these-worlds-novel",
+      "timeline-books-1-3",
+      "bobiverse-wiki",
+    ],
     reviewStatus: "pending-review",
     evidenceNote:
       "Replication timing remains provisional until the Book 3 verification pass is complete.",
@@ -399,7 +411,11 @@ const rawTimelineEvents = [
     chapterScopeId: "book-3-finale",
     starSystemId: "sol",
     bobIds: [],
-    sourceIds: ["all-these-worlds-novel", "timeline-books-1-3", "bobiverse-wiki"],
+    sourceIds: [
+      "all-these-worlds-novel",
+      "timeline-books-1-3",
+      "bobiverse-wiki",
+    ],
     reviewStatus: "pending-review",
     evidenceNote:
       "Battle date remains provisional until the Book 3 verification pass is complete.",

@@ -3,7 +3,11 @@
 :root {
   color: var(--color-text);
   background:
-    radial-gradient(circle at top left, rgba(204, 150, 100, 0.28), transparent 32%),
+    radial-gradient(
+      circle at top left,
+      rgba(204, 150, 100, 0.28),
+      transparent 32%
+    ),
     radial-gradient(
       circle at 85% 10%,
       rgba(114, 128, 95, 0.16),
@@ -35,9 +39,17 @@ body {
   background:
     linear-gradient(rgba(112, 82, 58, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(112, 82, 58, 0.04) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgba(204, 150, 100, 0.24), transparent 34%),
+    radial-gradient(
+      circle at top left,
+      rgba(204, 150, 100, 0.24),
+      transparent 34%
+    ),
     linear-gradient(180deg, #f4ebde 0%, #ecdfcd 55%, #e4d3bc 100%);
-  background-size: 48px 48px, 48px 48px, auto, auto;
+  background-size:
+    48px 48px,
+    48px 48px,
+    auto,
+    auto;
 }
 
 button,
