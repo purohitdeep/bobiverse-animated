@@ -2,20 +2,17 @@ import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useState } from "react";
 import { Vector3 } from "three";
-import type {
-  BobInstanceState,
-  SceneStarNode,
-  TimelineEventState,
-  TravelSegmentState,
+import {
+  computeSceneFraming,
+  type BobInstanceState,
+  type SceneStarNode,
+  type TimelineEventState,
+  type TravelSegmentState,
 } from "@bobiverse/simulation";
 
 const scenePalette = {
   background: "#10151c",
   fog: "#10151c",
-  sun: "#f4c56c",
-  rim: "#8bb9c7",
-  grid: "#29404a",
-  gridSubtle: "#162329",
   route: "#69d5cf",
   routeDim: "#375e64",
   bob: "#f3a66d",
@@ -160,15 +157,27 @@ function BobMarker({
   );
 }
 
-function CameraFocus({ selectedStar }: { selectedStar: SceneStarNode }) {
+/**
+ * Frames the camera on the selected system. The distance is derived from the
+ * content rather than hardcoded: Sol is the origin of the neighbourhood, so
+ * selecting it shows the whole field, while selecting a distant system moves
+ * in close enough to read its markers.
+ */
+function CameraFocus({
+  selectedStar,
+  cameraDistance,
+}: {
+  selectedStar: SceneStarNode;
+  cameraDistance: number;
+}) {
   const camera = useThree((state) => state.camera);
   const { x, y, z } = selectedStar.position;
+  const distance = selectedStar.id === "sol" ? cameraDistance : cameraDistance * 0.62;
 
   useEffect(() => {
-    const distance = selectedStar.id === "sol" ? 11.5 : 5.2;
     camera.position.set(x + distance * 0.82, y + distance * 0.5, z + distance * 0.82);
     camera.lookAt(new Vector3(x, y, z));
-  }, [camera, selectedStar.id, x, y, z]);
+  }, [camera, selectedStar.id, x, y, z, distance]);
 
   return null;
 }
@@ -311,6 +320,7 @@ export function StarfieldScene({
   const reducedMotion = useReducedMotion();
   const [webglAvailable] = useState(supportsWebGL);
   const selectedStar = stars.find((star) => star.id === selectedStarId) ?? stars[0];
+  const framing = useMemo(() => computeSceneFraming(stars), [stars]);
   const starPositionsById = useMemo(
     () =>
       new Map(
@@ -362,7 +372,14 @@ export function StarfieldScene({
   return (
     <>
       <Canvas
-      camera={{ position: [3.6, 2.4, 6.4], fov: 42 }}
+      camera={{
+        position: [
+          framing.center.x + framing.cameraDistance * 0.82,
+          framing.center.y + framing.cameraDistance * 0.5,
+          framing.center.z + framing.cameraDistance * 0.82,
+        ],
+        fov: 42,
+      }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       fallback={
@@ -373,23 +390,12 @@ export function StarfieldScene({
       }
     >
       <color attach="background" args={[scenePalette.background]} />
-      <fog attach="fog" args={[scenePalette.fog, 6, 16]} />
-      <ambientLight intensity={0.72} />
-      <pointLight
-        position={[0, 0, 0]}
-        intensity={34}
-        distance={18}
-        color={scenePalette.sun}
-      />
-      <directionalLight
-        position={[4, 5, 3]}
-        intensity={1.2}
-        color={scenePalette.rim}
-      />
-      <gridHelper
-        args={[16, 16, scenePalette.grid, scenePalette.gridSubtle]}
-        position={[0, -1.7, 0]}
-      />
+      {/* Range derived from the content: a fixed range either does nothing or
+          swallows the field depending on how large the dataset grows. */}
+      <fog attach="fog" args={[scenePalette.fog, framing.fogNear, framing.fogFar]} />
+      {/* No lights: every material in this scene is unlit (basic materials,
+          line materials, and additive points), so lights had no effect. */}
+
       <Stars
         radius={90}
         depth={60}
@@ -443,14 +449,25 @@ export function StarfieldScene({
         />
       ))}
 
-      <CameraFocus selectedStar={selectedStar} />
+      <CameraFocus
+        selectedStar={selectedStar}
+        cameraDistance={framing.cameraDistance}
+      />
+      {/* Orbit is constrained so the reader cannot rotate into a view where
+          the layout is unreadable or below the reference plane. */}
       <OrbitControls
         key={selectedStarId}
         enableDamping
         dampingFactor={0.08}
-        minDistance={2.2}
-        maxDistance={14}
-        target={[selectedStar.position.x, selectedStar.position.y, selectedStar.position.z]}
+        minDistance={framing.cameraDistance * 0.25}
+        maxDistance={framing.cameraDistance * 2.2}
+        minPolarAngle={0.05}
+        maxPolarAngle={1.25}
+        target={[
+          selectedStar.position.x,
+          selectedStar.position.y,
+          selectedStar.position.z,
+        ]}
       />
       </Canvas>
       <SchematicOverlay
