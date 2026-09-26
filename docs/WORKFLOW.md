@@ -13,6 +13,14 @@
 4. Review the desktop and narrow layouts, including the non-WebGL directory and reduced-motion state.
 5. Commit with a conventional message: `type(scope): description`.
 
+## Test placement
+
+1. Pure logic and data contracts use the default node environment.
+2. Component tests live next to the component and opt into jsdom with a
+   `@vitest-environment jsdom` docblock, so only those files pay the cost.
+3. Shared URL and view-state rules belong in `apps/web/src/store/viewState.ts`
+   with direct unit tests; `App.test.tsx` covers the wiring that connects them.
+
 ## Content changes
 
 - Treat novels as primary canon and keep provisional claims visibly flagged.

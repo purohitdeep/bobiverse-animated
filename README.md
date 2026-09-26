@@ -8,13 +8,17 @@ Research preview, actively built out. Working today:
 
 - Reader-first atlas shell with global search, linked system/map/event selection, and an accessible directory fallback
 - Spoiler-safe reading frontier controls with explicit curated chapter boundaries for Books 1–3
-- Deterministic time scrubbing, play/pause playback, event filters, linked event-to-map focus, and shareable URL state
+- Deterministic time scrubbing, play/pause playback, event filters, linked event-to-map focus, and shareable URL state that tracks the live frame
 - 3D neighborhood scene with catalog coordinates, sourced routes, replicant markers, and explicit in-transit progress
 - Replicant ledger with identity, generation, lineage-ready records, and story-frame location state
 - Provenance and review surfaces for events, systems, identities, routes, and source links
-- Workspace-wide strict TypeScript, unit tests, content audit, referential-integrity validation, and CI
+- Workspace-wide strict TypeScript, unit and component tests, content audit, referential-integrity validation, and CI
 
 Current coverage is intentionally honest: 3 books, 6 curated chapter boundaries, 7 systems, 10 provisional timeline events, 5 replicants, and 1 sourced journey (22 records awaiting primary-text review in total). Arbitrary chapter selection, primary-text fact-level locators, and a fully verified canon are not yet available. Seed content remains in TypeScript until the content-package loader is introduced.
+
+## Testing
+
+`npm run test` runs 73 tests across five files. Pure logic and data contracts run in a node environment. Component tests opt into jsdom per file with a `@vitest-environment jsdom` docblock, so only the files that need a DOM pay for it. URL view-state tests cover both directions: a shared link is validated before it is applied, and every later edit is mirrored back into the query string.
 
 ## Requirements
 

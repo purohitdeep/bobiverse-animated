@@ -10,7 +10,8 @@ The atlas is now a reader-facing research preview. The next work should deepen t
 4. Inspector tabs for system overview, story events, replicant cast, and source evidence.
 5. Explicit first-reveal metadata for events, replicants, routes, and narrative star annotations.
 6. Transit-aware world state and reduced-motion/WebGL-resilient rendering.
-7. Workspace-wide tests, typechecking, provenance audit, referential-integrity validation, and CI.
+7. Workspace-wide tests including jsdom component tests, typechecking, provenance audit, referential-integrity validation, and CI.
+8. Shareable URL state: deep links are validated before they are applied, and the query string tracks the live frame.
 
 ## Next milestone — trustworthy coverage
 
@@ -18,7 +19,7 @@ The atlas is now a reader-facing research preview. The next work should deepen t
 2. Add fact-level locators (book/chapter or catalog identifier) to every narrative and astronomical record.
 3. Curate the current 10 events, 6 boundaries, 5 identities, and 1 route against the primary novels; promote only reviewed records.
 4. Add explicit coverage states for unmapped chapters, systems, and identity relationships instead of implying completeness.
-5. Add prior/next event navigation, shareable URL state, and local favorites/notes.
+5. Add local favorites/notes, and restore the reading frame on reload.
 
 ## Later product work
 
