@@ -1,4 +1,4 @@
-import type { Book, ChapterScope, StarSystem, TimelineEvent } from "@bobiverse/domain";
+import { PARSECS_TO_LIGHT_YEARS, type Book, type ChapterScope, type StarSystem, type TimelineEvent } from "@bobiverse/domain";
 import {
   atlasBobInstances,
   atlasBooks,
@@ -90,6 +90,56 @@ function collectReferenceFindings(
  * that every cross-record reference, ordering claim, and manifest
  * membership resolves to a real record.
  */
+/**
+ * Photometric self-consistency for a star record.
+ *
+ * `distanceLy` and `parallaxMas` are two views of the same catalog fact, and
+ * a parsec value written into a light-year field is a severe, silent error.
+ * This is exported separately from `validateAtlas` so the rule can be tested
+ * directly against a fixture instead of only through the real dataset.
+ */
+export function collectStarPhotometryFindings(
+  stars: StarSystem[],
+  findings: AtlasValidationFinding[] = [],
+): AtlasValidationFinding[] {
+  for (const star of stars) {
+    if (star.colorIndexBv !== undefined) {
+      if (star.colorIndexBv < -0.5 || star.colorIndexBv > 2.5) {
+        addFinding(findings, {
+          severity: "error",
+          collection: "star system",
+          recordId: star.id,
+          message: `colorIndexBv outside the plausible stellar range: ${star.colorIndexBv}`,
+        });
+      }
+    }
+    if (star.visualMagnitude !== undefined) {
+      if (star.visualMagnitude > 7 || star.visualMagnitude < -30) {
+        addFinding(findings, {
+          severity: "error",
+          collection: "star system",
+          recordId: star.id,
+          message: `visualMagnitude outside [-30, 7]: ${star.visualMagnitude}`,
+        });
+      }
+    }
+    if (star.parallaxMas !== undefined) {
+      const derivedLightYears =
+        (PARSECS_TO_LIGHT_YEARS * 1000) / star.parallaxMas;
+      const tolerance = Math.max(derivedLightYears * 0.03, 0.15);
+      if (Math.abs(star.distanceLy - derivedLightYears) > tolerance) {
+        addFinding(findings, {
+          severity: "error",
+          collection: "star system",
+          recordId: star.id,
+          message: `distanceLy ${star.distanceLy} disagrees with parallax ${star.parallaxMas} mas, which implies ${derivedLightYears.toFixed(2)} ly (possible parsec/light-year mix-up)`,
+        });
+      }
+    }
+  }
+  return findings;
+}
+
 export function validateAtlas(): AtlasValidationReport {
   const findings: AtlasValidationFinding[] = [];
 
@@ -304,6 +354,8 @@ export function validateAtlas(): AtlasValidationReport {
       });
     }
   }
+
+  collectStarPhotometryFindings(seedStarSystems, findings);
 
   for (const star of seedStarSystems) {
     if (star.raHours < 0 || star.raHours >= 24) {

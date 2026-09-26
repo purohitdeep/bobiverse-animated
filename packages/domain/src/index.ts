@@ -41,10 +41,26 @@ export const StarSystemSchema = z.object({
   decDegrees: z.number(),
   distanceLy: z.number().nonnegative(),
   sourceType: SourceTypeSchema,
+  /**
+   * Gaia/Hipparcos parallax in milliarcseconds. Stored alongside the derived
+   * light-year distance so validation can prove the two agree: a parsec value
+   * written into a light-year field is otherwise indistinguishable from a
+   * correct one.
+   */
+  parallaxMas: z.number().positive().optional(),
+  /** SIMBAD spectral type, e.g. `G2V`. */
+  spectralType: z.string().min(1).optional(),
+  /** Johnson B−V colour index, the standard stellar colour proxy. */
+  colorIndexBv: z.number().optional(),
+  /** Apparent visual magnitude, used for display brightness and size. */
+  visualMagnitude: z.number().optional(),
   note: z.string().optional(),
   noteScopeId: z.string().min(1).optional(),
   ...ProvenanceFields,
 });
+
+/** Parsecs to light-years, for reconciling catalog parallaxes. */
+export const PARSECS_TO_LIGHT_YEARS = 3.26156;
 
 export const KnowledgeSourceSchema = z.object({
   id: z.string().min(1),
