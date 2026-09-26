@@ -183,6 +183,12 @@ export function validateAtlas(): AtlasValidationReport {
         referencedLabel: "book",
       },
       {
+        field: "revealedInScopeId",
+        referencedId: bob.revealedInScopeId,
+        knownIds: scopeIds,
+        referencedLabel: "chapter scope",
+      },
+      {
         field: "homeSystemId",
         referencedId: bob.homeSystemId,
         knownIds: starIds,
@@ -195,6 +201,19 @@ export function validateAtlas(): AtlasValidationReport {
         referencedLabel: "bob instance",
       },
     ], findings);
+
+    const revealingScope = atlasChapterScopes.find(
+      (scope) => scope.id === bob.revealedInScopeId,
+    );
+    if (revealingScope && revealingScope.bookId !== bob.introducedInBookId) {
+      addFinding(findings, {
+        severity: "error",
+        collection: "bob instance",
+        recordId: bob.id,
+        message:
+          "revealedInScopeId belongs to a different book than introducedInBookId",
+      });
+    }
   }
 
   for (const segment of atlasTravelSegments) {
@@ -210,6 +229,12 @@ export function validateAtlas(): AtlasValidationReport {
         referencedId: segment.bookId,
         knownIds: bookIds,
         referencedLabel: "book",
+      },
+      {
+        field: "revealedInScopeId",
+        referencedId: segment.revealedInScopeId,
+        knownIds: scopeIds,
+        referencedLabel: "chapter scope",
       },
       {
         field: "fromSystemId",
@@ -231,6 +256,19 @@ export function validateAtlas(): AtlasValidationReport {
         collection: "travel segment",
         recordId: segment.id,
         message: "departureYear is after arrivalYear",
+      });
+    }
+
+    const revealingScope = atlasChapterScopes.find(
+      (scope) => scope.id === segment.revealedInScopeId,
+    );
+    if (revealingScope && revealingScope.bookId !== segment.bookId) {
+      addFinding(findings, {
+        severity: "error",
+        collection: "travel segment",
+        recordId: segment.id,
+        message:
+          "revealedInScopeId belongs to a different book than the route's bookId",
       });
     }
   }
@@ -284,6 +322,14 @@ export function validateAtlas(): AtlasValidationReport {
         message: "decDegrees outside [-90, 90]",
       });
     }
+    collectReferenceFindings("star system", star.id, [
+      {
+        field: "noteScopeId",
+        referencedId: star.noteScopeId,
+        knownIds: scopeIds,
+        referencedLabel: "chapter scope",
+      },
+    ], findings);
   }
 
   return {
@@ -311,6 +357,8 @@ export function formatAtlasValidationReport(report: AtlasValidationReport) {
     `- Books: ${report.counts.books}`,
     `- Chapter scopes: ${report.counts.chapterScopes}`,
     `- Events: ${report.counts.events}`,
+    `- Replicants: ${report.counts.bobInstances}`,
+    `- Travel segments: ${report.counts.travelSegments}`,
     `- Findings: ${report.findings.length} (${errors.length} errors, ${warnings.length} warnings)`,
   ];
 

@@ -70,7 +70,7 @@ export function buildSceneStarNodes(
         y: base.z * scale,
         z: base.y * scale,
       },
-      radius: star.id === "sol" ? 0.22 : 0.12,
+      radius: star.id === "sol" ? 0.24 : 0.16,
       color: STAR_COLORS[index % STAR_COLORS.length] ?? "#f7d06b",
     };
   });
@@ -124,6 +124,39 @@ export function getChapterScopeById(
   chapterScopeId: string,
 ) {
   return scopes.find((scope) => scope.id === chapterScopeId) ?? null;
+}
+
+function isScopeWithinReadingFrontier(
+  revealingScope: ChapterScope | undefined,
+  selectedScope: ChapterScope,
+  bookOrderById: Map<string, number>,
+) {
+  if (!revealingScope) return false;
+  const revealingOrder = bookOrderById.get(revealingScope.bookId);
+  const selectedOrder = bookOrderById.get(selectedScope.bookId);
+  if (revealingOrder === undefined || selectedOrder === undefined) return false;
+  if (revealingOrder < selectedOrder) return true;
+  if (revealingOrder > selectedOrder) return false;
+  return revealingScope.chapter <= selectedScope.chapter;
+}
+
+export function getScopedStarNote(
+  star: StarSystem,
+  books: Book[],
+  scopes: ChapterScope[],
+  selectedScope: ChapterScope,
+) {
+  if (!star.note) return undefined;
+  if (!star.noteScopeId) return star.note;
+  const bookOrderById = new Map(books.map((book) => [book.id, book.order]));
+  const noteScope = scopes.find((scope) => scope.id === star.noteScopeId);
+  return isScopeWithinReadingFrontier(
+    noteScope,
+    selectedScope,
+    bookOrderById,
+  )
+    ? star.note
+    : undefined;
 }
 
 export function getBooksThroughSelection(
@@ -247,6 +280,7 @@ export function getScopedTravelSegments(
   }
 
   const bookOrderById = new Map(books.map((book) => [book.id, book.order]));
+  const scopeById = new Map(scopes.map((scope) => [scope.id, scope]));
 
   const visibleSegments = segments.filter((segment) => {
     const segmentBookOrder = bookOrderById.get(segment.bookId);
@@ -257,28 +291,13 @@ export function getScopedTravelSegments(
       return false;
     }
 
-    // Travel segments are revealed through the chapter scope that covers
-    // their departure year. Segments no scope covers stay hidden until
-    // curated, matching the timeline event policy.
-    const segmentScopes = scopes
-      .filter((scope) => scope.bookId === segment.bookId)
-      .sort((left, right) => left.chapter - right.chapter);
-    const revealingScope = segmentScopes.find(
-      (scope) => scope.maxYear >= segment.departureYear,
+    // Disclosure follows the curated scope where the route is first
+    // revealed, not whichever boundary happens to cover its departure year.
+    return isScopeWithinReadingFrontier(
+      scopeById.get(segment.revealedInScopeId),
+      selectedScope,
+      bookOrderById,
     );
-    if (!revealingScope) {
-      return false;
-    }
-
-    const revealingBookOrder = bookOrderById.get(revealingScope.bookId);
-    if (revealingBookOrder === undefined) {
-      return false;
-    }
-    if (revealingBookOrder < selectedBook.order) {
-      return true;
-    }
-
-    return revealingScope.chapter <= selectedScope.chapter;
   });
 
   return visibleSegments.map((segment) => {
@@ -292,17 +311,34 @@ export function getScopedTravelSegments(
   });
 }
 
+export type BobMovementState =
+  | { kind: "stationary" }
+  | {
+      kind: "in-transit";
+      segmentId: string;
+      fromSystemId: string;
+      toSystemId: string;
+      progress: number;
+    }
+  | {
+      kind: "arrived";
+      segmentId: string;
+      fromSystemId: string;
+      toSystemId: string;
+    };
+
 export interface BobInstanceState extends BobInstance {
   state: "not-yet-replicated" | "present";
   currentSystemId: string;
+  movement: BobMovementState;
 }
 
 /**
  * Deterministic replicant world state at a focal year, filtered through the
  * reading frontier. A replicant appears once it has been created and its
- * introduction is inside the reader's scope; its location resolves from
- * visible travel segments (in transit or arrived), falling back to the
- * home system. Segments that have not departed do not move anyone.
+ * explicit first-reveal scope is inside the reader's frontier; its location
+ * resolves from visible travel segments (in transit or arrived), falling
+ * back to the home system. Segments that have not departed do not move anyone.
  */
 export function getScopedBobInstances(
   bobs: BobInstance[],
@@ -322,6 +358,7 @@ export function getScopedBobInstances(
 
   const latestSegmentByBobId = new Map<string, TravelSegmentState>();
   for (const segment of scopedSegments) {
+    if (segment.state === "pre-departure") continue;
     const existing = latestSegmentByBobId.get(segment.bobId);
     if (!existing || existing.departureYear < segment.departureYear) {
       latestSegmentByBobId.set(segment.bobId, segment);
@@ -329,7 +366,7 @@ export function getScopedBobInstances(
   }
 
   const selectedBook = books.find((book) => book.id === selectedScope.bookId);
-  if (!selectedBook) {
+  if (!selectedBook || focalYear > selectedScope.maxYear) {
     return [];
   }
   const bookOrderById = new Map(books.map((book) => [book.id, book.order]));
@@ -345,33 +382,164 @@ export function getScopedBobInstances(
         return false;
       }
 
-      // The replicating chapter must be revealed before the identity is.
-      const introductionScopes = scopes
-        .filter((scope) => scope.bookId === bob.introducedInBookId)
-        .sort((left, right) => left.chapter - right.chapter);
-      const revealingScope = introductionScopes.find(
-        (scope) => scope.maxYear >= bob.createdYear,
+      // Identity disclosure follows the curated scope where the replicant
+      // is first revealed. Story year alone is not reader knowledge.
+      return isScopeWithinReadingFrontier(
+        scopes.find((scope) => scope.id === bob.revealedInScopeId),
+        selectedScope,
+        bookOrderById,
       );
-      if (!revealingScope) {
-        return false;
-      }
-      const revealingOrder = bookOrderById.get(revealingScope.bookId);
-      if (revealingOrder === undefined) {
-        return false;
-      }
-      return revealingOrder < selectedBook.order ||
-        revealingScope.chapter <= selectedScope.chapter;
     })
     .map((bob) => {
       const segment = latestSegmentByBobId.get(bob.id);
       let currentSystemId = bob.homeSystemId;
-      if (segment && segment.state === "arrived") {
+      let movement: BobMovementState = { kind: "stationary" };
+
+      if (segment?.state === "arrived") {
         currentSystemId = segment.toSystemId;
+        movement = {
+          kind: "arrived",
+          segmentId: segment.id,
+          fromSystemId: segment.fromSystemId,
+          toSystemId: segment.toSystemId,
+        };
+      } else if (segment?.state === "in-transit") {
+        const journeySpan = Math.max(
+          segment.arrivalYear - segment.departureYear,
+          Number.EPSILON,
+        );
+        movement = {
+          kind: "in-transit",
+          segmentId: segment.id,
+          fromSystemId: segment.fromSystemId,
+          toSystemId: segment.toSystemId,
+          progress: Math.min(
+            Math.max(
+              (focalYear - segment.departureYear) / journeySpan,
+              0,
+            ),
+            1,
+          ),
+        };
       }
+
       return {
         ...bob,
         state: "present" as const,
         currentSystemId,
+        movement,
       };
     });
+}
+
+export type AtlasSearchResult =
+  | {
+      kind: "system";
+      id: string;
+      title: string;
+      subtitle: string;
+      system: SceneStarNode;
+    }
+  | {
+      kind: "replicant";
+      id: string;
+      title: string;
+      subtitle: string;
+      replicant: BobInstanceState;
+    }
+  | {
+      kind: "event";
+      id: string;
+      title: string;
+      subtitle: string;
+      event: TimelineEventState;
+    };
+
+function normalizeSearchText(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function getSearchScore(query: string, ...values: string[]) {
+  const normalizedValues = values.map(normalizeSearchText);
+  if (normalizedValues.some((value) => value.startsWith(query))) {
+    return 0;
+  }
+  if (normalizedValues.some((value) => value.includes(query))) {
+    return 1;
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Searches only reader-visible content. Results are deliberately grouped by
+ * entity kind so the UI can present systems, replicants, and events without
+ * exposing records beyond the selected reading frontier.
+ */
+export function searchVisibleAtlas(
+  query: string,
+  systems: SceneStarNode[],
+  replicants: BobInstanceState[],
+  events: TimelineEventState[],
+  limit = 9,
+): AtlasSearchResult[] {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const results: Array<AtlasSearchResult & { score: number }> = [
+    ...systems.map((system) => ({
+      kind: "system" as const,
+      id: system.id,
+      title: system.name,
+      subtitle: `${system.distanceLy.toFixed(2)} ly · stellar system`,
+      system,
+      score: getSearchScore(normalizedQuery, system.name, system.id),
+    })),
+    ...replicants.map((replicant) => ({
+      kind: "replicant" as const,
+      id: replicant.id,
+      title: replicant.name,
+      subtitle: `Generation ${replicant.generation} · replicant`,
+      replicant,
+      score: getSearchScore(
+        normalizedQuery,
+        replicant.name,
+        replicant.id,
+        replicant.homeSystemId,
+        replicant.currentSystemId,
+        ...(replicant.movement.kind === "in-transit"
+          ? [replicant.movement.fromSystemId, replicant.movement.toSystemId]
+          : []),
+      ),
+    })),
+    ...events.map((event) => ({
+      kind: "event" as const,
+      id: event.id,
+      title: event.label,
+      subtitle: `${formatAtlasYear(event.year)} · ${event.type.replace(/-/g, " ")}`,
+      event,
+      score: getSearchScore(
+        normalizedQuery,
+        event.label,
+        event.id,
+        event.type.replace(/-/g, " "),
+      ),
+    })),
+  ]
+    .filter((result) => Number.isFinite(result.score))
+    .sort(
+      (left, right) =>
+        left.score - right.score || left.title.localeCompare(right.title),
+    )
+    .slice(0, Math.max(0, limit));
+
+  return results.map(({ score: _score, ...result }) => result);
+}
+
+export function formatAtlasYear(year: number) {
+  if (!Number.isFinite(year)) {
+    return "—";
+  }
+  return Number.isInteger(year) ? String(year) : year.toFixed(1);
 }

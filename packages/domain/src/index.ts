@@ -42,6 +42,7 @@ export const StarSystemSchema = z.object({
   distanceLy: z.number().nonnegative(),
   sourceType: SourceTypeSchema,
   note: z.string().optional(),
+  noteScopeId: z.string().min(1).optional(),
   ...ProvenanceFields,
 });
 
@@ -83,6 +84,7 @@ export const BobInstanceSchema = z.object({
   name: z.string().min(1),
   generation: z.number().int().nonnegative(),
   introducedInBookId: z.string().min(1),
+  revealedInScopeId: z.string().min(1),
   createdYear: z.number(),
   homeSystemId: z.string().min(1),
   parentId: z.string().min(1).optional(),
@@ -93,6 +95,7 @@ export const TravelSegmentSchema = z.object({
   id: z.string().min(1),
   bobId: z.string().min(1),
   bookId: z.string().min(1),
+  revealedInScopeId: z.string().min(1),
   fromSystemId: z.string().min(1),
   toSystemId: z.string().min(1),
   departureYear: z.number(),

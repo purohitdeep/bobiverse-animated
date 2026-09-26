@@ -6,9 +6,11 @@ import {
   type ContentAuditReport,
 } from "./audit.ts";
 import {
+  atlasBobInstances,
   atlasBooks,
   atlasChapterScopes,
   atlasTimelineEvents,
+  atlasTravelSegments,
   knowledgeSources,
   seedStarSystems,
 } from "./index.ts";
@@ -61,7 +63,9 @@ describe("runContentAudit", () => {
       seedStarSystems.length +
       atlasBooks.length +
       atlasChapterScopes.length +
-      atlasTimelineEvents.length;
+      atlasTimelineEvents.length +
+      atlasBobInstances.length +
+      atlasTravelSegments.length;
     expect(report.summary.recordCount).toBe(expected);
   });
 

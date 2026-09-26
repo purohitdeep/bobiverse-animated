@@ -1,15 +1,19 @@
 import type {
   Book,
+  BobInstance,
   ChapterScope,
   KnowledgeSource,
   ReviewStatus,
   StarSystem,
   TimelineEvent,
+  TravelSegment,
 } from "@bobiverse/domain";
 import {
+  atlasBobInstances,
   atlasBooks,
   atlasChapterScopes,
   atlasTimelineEvents,
+  atlasTravelSegments,
   knowledgeSources,
   seedStarSystems,
 } from "./index.ts";
@@ -206,12 +210,16 @@ export function runContentAudit(): ContentAuditReport {
 
   const findings: ContentAuditFinding[] = [];
   const collections: Array<
-    AuditCollection<Book | ChapterScope | StarSystem | TimelineEvent>
+    AuditCollection<
+      Book | BobInstance | ChapterScope | StarSystem | TimelineEvent | TravelSegment
+    >
   > = [
     { label: "star system", records: seedStarSystems },
     { label: "book", records: atlasBooks },
     { label: "chapter scope", records: atlasChapterScopes },
     { label: "timeline event", records: atlasTimelineEvents },
+    { label: "bob instance", records: atlasBobInstances },
+    { label: "travel segment", records: atlasTravelSegments },
   ];
 
   for (const collection of collections) {

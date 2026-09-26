@@ -99,6 +99,8 @@ describe("formatAtlasValidationReport", () => {
         travelSegments: 0,
       },
     });
+    expect(text).toContain("Replicants: 0");
+    expect(text).toContain("Travel segments: 0");
     expect(text).toContain("Findings: none");
   });
 });

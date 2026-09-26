@@ -10,9 +10,12 @@ import type {
 import {
   clampYearToBounds,
   getScopedBobInstances,
+  getScopedStarNote,
   getScopedTimelineEvents,
   getScopedTravelSegments,
   getTimelineBounds,
+  formatAtlasYear,
+  searchVisibleAtlas,
   toCartesianCoordinate,
 } from "./index.ts";
 
@@ -80,6 +83,7 @@ function makeBob(overrides: Partial<BobInstance> = {}): BobInstance {
     name: "Test Bob",
     generation: 1,
     introducedInBookId: "test-book",
+    revealedInScopeId: "test-scope",
     createdYear: 2135,
     homeSystemId: "test-star",
     sourceIds: ["test-source"],
@@ -96,6 +100,7 @@ function makeSegment(
     id: "test-segment",
     bobId: "test-bob",
     bookId: "test-book",
+    revealedInScopeId: "test-scope",
     fromSystemId: "test-star",
     toSystemId: "target-star",
     departureYear: 2140,
@@ -270,6 +275,25 @@ describe("getScopedTimelineEvents", () => {
   });
 });
 
+describe("getScopedStarNote", () => {
+  it("keeps a public system note hidden until its narrative scope is reached", () => {
+    const star = makeStar({
+      note: "A later-book conflict system.",
+      noteScopeId: "scope-finale",
+    });
+    const earlyScope = makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 });
+    const lateScope = makeScope({ id: "scope-finale", chapter: 10, maxYear: 2200 });
+    const books = [makeBook()];
+
+    expect(
+      getScopedStarNote(star, books, [earlyScope, lateScope], earlyScope),
+    ).toBeUndefined();
+    expect(
+      getScopedStarNote(star, books, [earlyScope, lateScope], lateScope),
+    ).toBe("A later-book conflict system.");
+  });
+});
+
 describe("getScopedTravelSegments", () => {
   it("reports a segment as in transit between departure and arrival", () => {
     const segments = getScopedTravelSegments(
@@ -312,13 +336,22 @@ describe("getScopedTravelSegments", () => {
     expect(segments).toHaveLength(0);
   });
 
-  it("hides segments departing after the selected scope's max year", () => {
+  it("hides a route first revealed in a later chapter even when its year is early", () => {
     const segments = getScopedTravelSegments(
-      [makeSegment({ departureYear: 2190, arrivalYear: 2199 })],
+      [
+        makeSegment({
+          departureYear: 2140,
+          arrivalYear: 2150,
+          revealedInScopeId: "scope-finale",
+        }),
+      ],
       [makeBook()],
-      [makeScope({ maxYear: 2180 })],
-      makeScope({ maxYear: 2180 }),
-      2180,
+      [
+        makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+        makeScope({ id: "scope-finale", chapter: 10, maxYear: 2200 }),
+      ],
+      makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+      2120,
     );
     expect(segments).toHaveLength(0);
   });
@@ -361,6 +394,33 @@ describe("getScopedBobInstances", () => {
       2160,
     );
     expect(bobs[0]?.currentSystemId).toBe("target-star");
+    expect(bobs[0]?.movement).toEqual({
+      kind: "arrived",
+      segmentId: "test-segment",
+      fromSystemId: "test-star",
+      toSystemId: "target-star",
+    });
+  });
+
+  it("keeps the latest departed journey when a later route is only planned", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob()],
+      [
+        makeSegment(),
+        makeSegment({
+          id: "future-segment",
+          departureYear: 2160,
+          arrivalYear: 2170,
+        }),
+      ],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2155,
+    );
+
+    expect(bobs[0]?.currentSystemId).toBe("target-star");
+    expect(bobs[0]?.movement.kind).toBe("arrived");
   });
 
   it("keeps a replicant at home while its journey is in transit", () => {
@@ -375,7 +435,7 @@ describe("getScopedBobInstances", () => {
     expect(bobs[0]?.currentSystemId).toBe("test-star");
   });
 
-  it("hides replicants introduced beyond the selected chapter scope", () => {
+  it("hides replicants created beyond the selected frontier", () => {
     const bobs = getScopedBobInstances(
       [makeBob({ createdYear: 2190 })],
       [],
@@ -385,5 +445,88 @@ describe("getScopedBobInstances", () => {
       2200,
     );
     expect(bobs).toHaveLength(0);
+  });
+
+  it("hides a replicant first revealed in a later chapter", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob({ createdYear: 2140, revealedInScopeId: "scope-finale" })],
+      [],
+      [makeBook()],
+      [
+        makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+        makeScope({ id: "scope-finale", chapter: 10, maxYear: 2200 }),
+      ],
+      makeScope({ id: "scope-early", chapter: 1, maxYear: 2120 }),
+      2140,
+    );
+    expect(bobs).toHaveLength(0);
+  });
+
+  it("exposes deterministic progress while a replicant is in transit", () => {
+    const bobs = getScopedBobInstances(
+      [makeBob()],
+      [makeSegment()],
+      [makeBook()],
+      [makeScope()],
+      makeScope(),
+      2145,
+    );
+
+    expect(bobs[0]?.movement).toEqual({
+      kind: "in-transit",
+      segmentId: "test-segment",
+      fromSystemId: "test-star",
+      toSystemId: "target-star",
+      progress: 0.5,
+    });
+  });
+});
+
+describe("searchVisibleAtlas", () => {
+  const system = {
+    ...makeStar(),
+    position: { x: 0, y: 0, z: 0 },
+    radius: 0.1,
+    color: "#fff",
+  };
+  const replicant = {
+    ...makeBob({ name: "Bob Prime" }),
+    state: "present" as const,
+    currentSystemId: "test-star",
+    movement: { kind: "stationary" as const },
+  };
+  const event = {
+    ...makeEvent({ label: "Bob reaches Epsilon Eridani" }),
+    state: "future" as const,
+  };
+
+  it("prioritizes prefix matches across visible entity types", () => {
+    const results = searchVisibleAtlas("bob", [system], [replicant], [event]);
+    expect(results.map((result) => result.kind)).toEqual([
+      "replicant",
+      "event",
+    ]);
+  });
+
+  it("ignores empty queries and unmatched records", () => {
+    expect(searchVisibleAtlas("  ", [system], [replicant], [event])).toEqual(
+      [],
+    );
+    expect(
+      searchVisibleAtlas("nothing", [system], [replicant], [event]),
+    ).toEqual([]);
+  });
+
+  it("respects the result limit", () => {
+    const results = searchVisibleAtlas("test", [system], [replicant], [event], 2);
+    expect(results).toHaveLength(2);
+  });
+});
+
+describe("formatAtlasYear", () => {
+  it("keeps whole years compact and rounds fractional years", () => {
+    expect(formatAtlasYear(2144)).toBe("2144");
+    expect(formatAtlasYear(2144.64)).toBe("2144.6");
+    expect(formatAtlasYear(Number.NaN)).toBe("—");
   });
 });
