@@ -1,13 +1,15 @@
-import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
+import { Html, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
+  ACESFilmicToneMapping,
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   ShaderMaterial,
   Vector3,
 } from "three";
+import { GalacticBackdrop } from "./scene/GalacticBackdrop";
 import {
   buildStarPointAttributes,
   computeSceneFraming,
@@ -24,6 +26,10 @@ const scenePalette = {
   routeDim: "#375e64",
   bob: "#f3a66d",
 };
+
+// Kept out of the main scene chunk: readers who never open the spatial view,
+// or who run without post-processing, never download the render pipeline.
+const LazyPostProcessing = lazy(() => import("./scene/PostProcessing"));
 
 function supportsWebGL() {
   if (typeof document === "undefined") return true;
@@ -44,6 +50,8 @@ interface StarfieldSceneProps {
   events: TimelineEventState[];
   bobs: BobInstanceState[];
   onSelectStar: (starId: string) => void;
+  /** Post-processing needs WebGL2; it can be switched off on weaker devices. */
+  usePostProcessing?: boolean;
 }
 
 /**
@@ -444,6 +452,7 @@ export function StarfieldScene({
   events,
   bobs,
   onSelectStar,
+  usePostProcessing = true,
 }: StarfieldSceneProps) {
   const reducedMotion = useReducedMotion();
   const [webglAvailable] = useState(supportsWebGL);
@@ -509,7 +518,14 @@ export function StarfieldScene({
         fov: 42,
       }}
       dpr={[1, 1.5]}
-      gl={{ antialias: true, powerPreference: "high-performance" }}
+      gl={{
+        antialias: false,
+        powerPreference: "high-performance",
+        // Tone mapping is applied once by the composer's OutputPass. Three
+        // skips it for the RenderPass automatically because that renders to
+        // an off-screen target, so setting it here does not double-apply it.
+        toneMapping: ACESFilmicToneMapping,
+      }}
       raycaster={{
         params: {
           Mesh: {},
@@ -535,14 +551,13 @@ export function StarfieldScene({
       {/* No lights: every material in this scene is unlit (basic materials,
           line materials, and additive points), so lights had no effect. */}
 
-      <Stars
-        radius={90}
-        depth={60}
-        count={2800}
-        factor={3.5}
-        saturation={0}
-        speed={reducedMotion ? 0 : 0.12}
-      />
+      <Suspense fallback={null}>
+        <GalacticBackdrop
+          fieldRadius={framing.radius}
+          fieldCount={reducedMotion ? 1400 : 2200}
+        />
+        {usePostProcessing ? <LazyPostProcessing /> : null}
+      </Suspense>
 
       {travelSegments.map((segment) => {
         const from = starPositionsById.get(segment.fromSystemId);
