@@ -29,22 +29,6 @@ export interface TimelineEventState extends TimelineEvent {
   state: "past" | "active" | "future";
 }
 
-const STAR_COLORS: readonly [
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-] = [
-  "#f7d06b",
-  "#79d8ff",
-  "#88f0b5",
-  "#ffa26e",
-  "#f0a6ff",
-  "#c2d2ff",
-];
-
 export function toCartesianCoordinate(star: StarSystem): CartesianCoordinate {
   const rightAscension = star.raHours * (Math.PI / 12);
   const declination = star.decDegrees * (Math.PI / 180);
@@ -61,8 +45,9 @@ export function buildSceneStarNodes(
   stars: StarSystem[],
   scale = 0.18,
 ): SceneStarNode[] {
-  return stars.map((star, index) => {
+  return stars.map((star) => {
     const base = toCartesianCoordinate(star);
+    const color = getStarColor(star.colorIndexBv);
     return {
       ...star,
       position: {
@@ -71,13 +56,208 @@ export function buildSceneStarNodes(
         z: base.y * scale,
       },
       radius: star.id === "sol" ? 0.24 : 0.16,
-      color: STAR_COLORS[index % STAR_COLORS.length] ?? "#f7d06b",
+      // Derived from the catalog colour index so the 3D view and the HTML
+      // directory agree, and so reordering content cannot recolour the map.
+      color: toHexColor(color),
     };
   });
 }
 
+/** Linear 0..1 RGB to a CSS hex string. */
+function toHexColor(color: StarColor) {
+  const channel = (value: number) =>
+    Math.round(clamp(value, 0, 1) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(color.r)}${channel(color.g)}${channel(color.b)}`;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+export interface StarColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+function clampColorChannel(value: number) {
+  return Math.min(Math.max(value, 0), 255) / 255;
+}
+
+/**
+ * Effective temperature from the Johnson B−V colour index, using the
+ * Ballesteros (2012) relation. It is a good approximation over the
+ * dwarf/giant range these systems fall in: B−V 0.65 (Sol) yields ~5780 K
+ * against an accepted solar effective temperature of ~5772 K.
+ */
+export function getStarEffectiveTemperature(colorIndexBv: number): number {
+  const bv = clamp(colorIndexBv, -0.5, 2.5);
+  return 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62));
+}
+
+/**
+ * Blackbody colour for a stellar temperature, returned in linear 0..1 RGB.
+ *
+ * A hotter star is genuinely bluer, so this replaces the previous palette
+ * that assigned colour by array index, which meant reordering the content
+ * silently recoloured the map.
+ */
+export function getStarColorFromTemperature(kelvin: number): StarColor {
+  const t = clamp(kelvin, 1000, 40000) / 100;
+
+  const red =
+    t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592);
+  const green =
+    t <= 66
+      ? 99.4708025861 * Math.log(t) - 161.1195681661
+      : 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+  const blue =
+    t >= 66 ? 255 : t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+
+  return {
+    r: clampColorChannel(red),
+    g: clampColorChannel(green),
+    b: clampColorChannel(blue),
+  };
+}
+
+/** Fallback tint for a star with no recorded colour index. */
+const NEUTRAL_STAR_COLOR: StarColor = { r: 0.96, g: 0.96, b: 1 };
+
+export function getStarColor(colorIndexBv: number | undefined): StarColor {
+  if (colorIndexBv === undefined) {
+    return NEUTRAL_STAR_COLOR;
+  }
+  return getStarColorFromTemperature(getStarEffectiveTemperature(colorIndexBv));
+}
+
+export interface StarDisplayStyle {
+  /** Relative display size, in scene units. */
+  size: number;
+  color: StarColor;
+}
+
+export interface StarDisplayOptions {
+  minSize?: number;
+  maxSize?: number;
+  /**
+   * Exponent applied to normalised brightness. Below 1 compresses the huge
+   * dynamic range of magnitudes so Sol stays prominent without swallowing
+   * the field.
+   */
+  gamma?: number;
+}
+
+function resolveDisplaySize(
+  visualMagnitude: number | undefined,
+  brightest: number,
+  faintest: number,
+  minSize: number,
+  maxSize: number,
+  gamma: number,
+  fallback: number,
+) {
+  if (visualMagnitude === undefined) {
+    return fallback;
+  }
+  const span = faintest - brightest;
+  // A single star, or a set of identical magnitudes, has no range to map.
+  const normalized = span <= 0 ? 1 : clamp((visualMagnitude - faintest) / -span, 0, 1);
+  return minSize + (maxSize - minSize) * Math.pow(normalized, gamma);
+}
+
+/**
+ * Derives per-star display size and colour from catalog photometry.
+ *
+ * Size encodes *relative* apparent brightness within the atlas, on a
+ * compressed scale. It deliberately does not attempt absolute luminosity: Sol
+ * is roughly ten billion times brighter than Alpha Centauri, and any linear
+ * mapping would either erase every other system or render Sol alone.
+ *
+ * Distance is not folded into brightness. A star's apparent magnitude already
+ * accounts for its distance, so dimming far systems would be a fabricated
+ * effect. Distance is expressed through position and the distance rings.
+ */
+export function getStarDisplayStyles<T extends { id: string; visualMagnitude?: number | undefined; colorIndexBv?: number | undefined }>(
+  stars: T[],
+  options: StarDisplayOptions = {},
+): Map<string, StarDisplayStyle> {
+  const { minSize = 0.08, maxSize = 0.3, gamma = 0.5 } = options;
+
+  const magnitudes = stars
+    .map((star) => star.visualMagnitude)
+    .filter((value): value is number => value !== undefined);
+
+  const brightest = magnitudes.length ? Math.min(...magnitudes) : 0;
+  const faintest = magnitudes.length ? Math.max(...magnitudes) : 0;
+  const fallback = (minSize + maxSize) / 2;
+
+  return new Map(
+    stars.map((star) => [
+      star.id,
+      {
+        size: resolveDisplaySize(
+          star.visualMagnitude,
+          brightest,
+          faintest,
+          minSize,
+          maxSize,
+          gamma,
+          fallback,
+        ),
+        color: getStarColor(star.colorIndexBv),
+      },
+    ]),
+  );
+}
+
+export interface StarPointAttributes {
+  positions: Float32Array;
+  colors: Float32Array;
+  sizes: Float32Array;
+  ids: string[];
+}
+
+/**
+ * Packs the scene into typed arrays for a single additive Points draw call.
+ * One draw call keeps the star layer cheap regardless of catalogue size.
+ */
+export function buildStarPointAttributes(
+  stars: Array<{
+    id: string;
+    position: CartesianCoordinate;
+    visualMagnitude?: number | undefined;
+    colorIndexBv?: number | undefined;
+  }>,
+  options: StarDisplayOptions = {},
+): StarPointAttributes {
+  const styles = getStarDisplayStyles(stars, options);
+  const minSize = options.minSize ?? 0.08;
+  const maxSize = options.maxSize ?? 0.3;
+  const fallbackSize = (minSize + maxSize) / 2;
+  const positions = new Float32Array(stars.length * 3);
+  const colors = new Float32Array(stars.length * 3);
+  const sizes = new Float32Array(stars.length);
+  const ids: string[] = [];
+
+  stars.forEach((star, index) => {
+    const style = styles.get(star.id) ?? {
+      size: fallbackSize,
+      color: NEUTRAL_STAR_COLOR,
+    };
+    positions[index * 3] = star.position.x;
+    positions[index * 3 + 1] = star.position.y;
+    positions[index * 3 + 2] = star.position.z;
+    colors[index * 3] = style.color.r;
+    colors[index * 3 + 1] = style.color.g;
+    colors[index * 3 + 2] = style.color.b;
+    sizes[index] = style.size;
+    ids.push(star.id);
+  });
+
+  return { positions, colors, sizes, ids };
 }
 
 export function getNeighborhoodSummary(stars: StarSystem[]) {

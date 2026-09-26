@@ -1,8 +1,15 @@
 import { Html, Line, OrbitControls, Stars } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useState } from "react";
-import { Vector3 } from "three";
 import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  ShaderMaterial,
+  Vector3,
+} from "three";
+import {
+  buildStarPointAttributes,
   computeSceneFraming,
   type BobInstanceState,
   type SceneStarNode,
@@ -39,61 +46,182 @@ interface StarfieldSceneProps {
   onSelectStar: (starId: string) => void;
 }
 
-interface StarMarkerProps {
-  star: SceneStarNode;
-  isSelected: boolean;
-  residentCount: number;
-  eventCount: number;
+/**
+ * Stars are drawn as additive points rather than spheres.
+ *
+ * A sphere is a solid object with a physical size, so two nearby systems
+ * interpenetrate and read as one blob: Epsilon Eridani and Omicron2 Eridani
+ * sit 0.194 units apart with 0.32-unit spheres. A point has no silhouette to
+ * merge, so brightness and colour carry the identity instead, and the whole
+ * layer costs a single draw call.
+ *
+ * Colour comes from the catalog B-V index and size from apparent magnitude
+ * (see getStarDisplayStyles), so neither depends on array order.
+ */
+const STAR_VERTEX_SHADER = /* glsl */ `
+  attribute vec3 starColor;
+  attribute float starSize;
+  uniform float uScale;
+  varying vec3 vColor;
+
+  void main() {
+    vColor = starColor;
+    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = starSize * uScale / max(-viewPosition.z, 0.0001);
+    gl_Position = projectionMatrix * viewPosition;
+  }
+`;
+
+const STAR_FRAGMENT_SHADER = /* glsl */ `
+  varying vec3 vColor;
+
+  void main() {
+    vec2 offset = gl_PointCoord - vec2(0.5);
+    float distanceFromCentre = length(offset) * 2.0;
+    if (distanceFromCentre > 1.0) discard;
+
+    // Bright core, exponential halo, and a faint cross for diffraction.
+    float core = smoothstep(0.30, 0.0, distanceFromCentre);
+    float halo = exp(-distanceFromCentre * 3.1) * 0.55;
+    float spikes = (max(0.0, 1.0 - abs(offset.x) * 26.0)
+                  + max(0.0, 1.0 - abs(offset.y) * 26.0))
+                 * smoothstep(1.0, 0.12, distanceFromCentre) * 0.30;
+
+    float intensity = core + halo + spikes;
+    // Alpha stays at 1 so additive blending (src = SrcAlpha) accumulates the
+    // colour as written. Premultiplying here would square the intensity and
+    // dim every star.
+    gl_FragColor = vec4(vColor * intensity, 1.0);
+  }
+`;
+
+function StarPoints({
+  stars,
+  onSelectStar,
+}: {
+  stars: SceneStarNode[];
   onSelectStar: (starId: string) => void;
+}) {
+  const { size, viewport, camera } = useThree();
+  const attributes = useMemo(() => buildStarPointAttributes(stars), [stars]);
+
+  const geometry = useMemo(() => {
+    const next = new BufferGeometry();
+    next.setAttribute("position", new BufferAttribute(attributes.positions, 3));
+    next.setAttribute("starColor", new BufferAttribute(attributes.colors, 3));
+    next.setAttribute("starSize", new BufferAttribute(attributes.sizes, 1));
+    next.computeBoundingSphere();
+    return next;
+  }, [attributes]);
+
+  // Convert world-space radius into pixels for the current viewport and lens.
+  // The scale only changes on resize, so the material is rebuilt rather than
+  // mutated in place.
+  const fovRadians = ((camera as { fov?: number }).fov ?? 42) * (Math.PI / 180);
+  const scale =
+    (size.height * viewport.dpr) / (2 * Math.tan(fovRadians / 2));
+
+  const material = useMemo(
+    () =>
+      new ShaderMaterial({
+        vertexShader: STAR_VERTEX_SHADER,
+        fragmentShader: STAR_FRAGMENT_SHADER,
+        uniforms: { uScale: { value: scale } },
+        transparent: true,
+        depthWrite: false,
+        // Additive light: overlapping systems add together instead of
+        // occluding, which is what keeps a dense region readable.
+        blending: AdditiveBlending,
+        toneMapped: false,
+      }),
+    [scale],
+  );
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
+  useEffect(() => {
+    return () => {
+      material.dispose();
+    };
+  }, [material]);
+
+  return (
+    <points
+      geometry={geometry}
+      material={material}
+      onClick={(event) => {
+        event.stopPropagation();
+        const starId =
+          event.index === undefined ? undefined : attributes.ids[event.index];
+        if (starId) onSelectStar(starId);
+      }}
+      onPointerOver={() => {
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "default";
+      }}
+    />
+  );
 }
 
-function StarMarker({
-  star,
-  isSelected,
-  residentCount,
-  eventCount,
-  onSelectStar,
-}: StarMarkerProps) {
+function SelectedStarRing({ star }: { star: SceneStarNode }) {
   return (
-    <group position={[star.position.x, star.position.y, star.position.z]}>
-      {isSelected ? (
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[star.radius * 1.8, 0.018, 8, 48]} />
-          <meshBasicMaterial color={scenePalette.route} transparent opacity={0.75} />
-        </mesh>
-      ) : null}
-      <mesh
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelectStar(star.id);
-        }}
-        onPointerOver={() => {
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "default";
-        }}
-      >
-        <sphereGeometry
-          args={[isSelected ? star.radius * 1.28 : star.radius, 32, 32]}
-        />
-        <meshBasicMaterial
-          color={star.color}
-          toneMapped={false}
-          transparent={isSelected}
-          opacity={isSelected ? 1 : 0.88}
-        />
-      </mesh>
-      {isSelected || eventCount > 0 ? (
-        <Html center distanceFactor={7}>
-          <div className={isSelected ? "star-label selected" : "star-label"}>
-            <span>{star.name}</span>
-            {eventCount > 0 ? <b>{eventCount} {eventCount === 1 ? "event" : "events"}</b> : null}
-            {residentCount > 0 ? <em>{residentCount} here</em> : null}
-          </div>
-        </Html>
-      ) : null}
-    </group>
+    <mesh
+      position={[star.position.x, star.position.y, star.position.z]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <torusGeometry args={[star.radius * 1.8, 0.014, 8, 48]} />
+      <meshBasicMaterial
+        color={scenePalette.route}
+        transparent
+        opacity={0.8}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+function StarLabels({
+  stars,
+  eventCountByStar,
+  residentCountByStar,
+  selectedStarId,
+}: {
+  stars: SceneStarNode[];
+  eventCountByStar: Map<string, number>;
+  residentCountByStar: Map<string, number>;
+  selectedStarId: string;
+}) {
+  return (
+    <>
+      {stars.map((star) => {
+        const isSelected = star.id === selectedStarId;
+        const eventCount = eventCountByStar.get(star.id) ?? 0;
+        const residentCount = residentCountByStar.get(star.id) ?? 0;
+        // With only a handful of systems, labelling all of them costs
+        // nothing and removes the "what is that unlabelled blob" problem.
+        return (
+          <group key={star.id} position={[star.position.x, star.position.y, star.position.z]}>
+            <Html center distanceFactor={7}>
+              <div className={isSelected ? "star-label selected" : "star-label"}>
+                <span>{star.name}</span>
+                {eventCount > 0 ? (
+                  <b>
+                    {eventCount} {eventCount === 1 ? "event" : "events"}
+                  </b>
+                ) : null}
+                {residentCount > 0 ? <em>{residentCount} here</em> : null}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+    </>
   );
 }
 
@@ -382,6 +510,17 @@ export function StarfieldScene({
       }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
+      raycaster={{
+        params: {
+          Mesh: {},
+          Line: { threshold: 1 },
+          LOD: {},
+          // Points have no physical surface to intersect, so picking uses a
+          // world-space radius around each point instead.
+          Points: { threshold: 0.3 },
+          Sprite: {},
+        },
+      }}
       fallback={
         <div className="scene-fallback-inline" role="alert">
           <strong>Spatial view unavailable</strong>
@@ -429,16 +568,16 @@ export function StarfieldScene({
         );
       })}
 
-      {stars.map((star) => (
-        <StarMarker
-          key={star.id}
-          star={star}
-          isSelected={star.id === selectedStarId}
-          residentCount={residentCountByStar.get(star.id) ?? 0}
-          eventCount={eventCountByStar.get(star.id) ?? 0}
-          onSelectStar={onSelectStar}
-        />
-      ))}
+      <StarPoints stars={stars} onSelectStar={onSelectStar} />
+
+      {selectedStar ? <SelectedStarRing star={selectedStar} /> : null}
+
+      <StarLabels
+        stars={stars}
+        eventCountByStar={eventCountByStar}
+        residentCountByStar={residentCountByStar}
+        selectedStarId={selectedStarId}
+      />
 
       {bobs.map((bob) => (
         <BobMarker

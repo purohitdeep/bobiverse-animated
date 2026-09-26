@@ -8,9 +8,14 @@ import type {
   TravelSegment,
 } from "@bobiverse/domain";
 import {
+  buildStarPointAttributes,
   clampYearToBounds,
   computeSceneFraming,
   createSeededRandom,
+  getStarColor,
+  getStarColorFromTemperature,
+  getStarDisplayStyles,
+  getStarEffectiveTemperature,
   getScopedBobInstances,
   getScopedStarNote,
   getScopedTimelineEvents,
@@ -113,6 +118,123 @@ function makeSegment(
     ...overrides,
   };
 }
+
+describe("getStarEffectiveTemperature", () => {
+  it("reproduces the solar effective temperature from the Sun's colour index", () => {
+    // B-V 0.65 should give roughly the accepted ~5772 K.
+    expect(getStarEffectiveTemperature(0.65)).toBeGreaterThan(5600);
+    expect(getStarEffectiveTemperature(0.65)).toBeLessThan(5900);
+  });
+
+  it("cools monotonically as colour index rises", () => {
+    const hot = getStarEffectiveTemperature(0.3);
+    const mid = getStarEffectiveTemperature(1.0);
+    const cool = getStarEffectiveTemperature(1.8);
+    expect(hot).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(cool);
+  });
+
+  it("clamps absurd colour indices into a physical range", () => {
+    expect(Number.isFinite(getStarEffectiveTemperature(-99))).toBe(true);
+    expect(Number.isFinite(getStarEffectiveTemperature(99))).toBe(true);
+  });
+});
+
+describe("getStarColorFromTemperature", () => {
+  it("keeps every channel within the displayable range", () => {
+    for (const kelvin of [1500, 3000, 5772, 10000, 25000]) {
+      const color = getStarColorFromTemperature(kelvin);
+      for (const channel of [color.r, color.g, color.b]) {
+        expect(channel).toBeGreaterThanOrEqual(0);
+        expect(channel).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("renders hotter stars bluer and cooler stars redder", () => {
+    const hot = getStarColorFromTemperature(12000);
+    const cool = getStarColorFromTemperature(3200);
+    // "Bluer" means the blue channel leads the red channel.
+    expect(hot.b - hot.r).toBeGreaterThan(cool.b - cool.r);
+  });
+});
+
+describe("getStarColor", () => {
+  it("falls back to a neutral tint when no colour index is recorded", () => {
+    const color = getStarColor(undefined);
+    expect(color.r).toBeCloseTo(color.b, 1);
+  });
+
+  it("does not depend on the order stars are supplied in", () => {
+    // The previous palette indexed by array position, so reordering the
+    // content silently recoloured the map.
+    const a = makeStar({ id: "a", colorIndexBv: 0.65 });
+    const b = makeStar({ id: "b", colorIndexBv: 1.5 });
+    const forward = getStarDisplayStyles([a, b]);
+    const reversed = getStarDisplayStyles([b, a]);
+    expect(reversed.get("a")?.color).toEqual(forward.get("a")?.color);
+    expect(reversed.get("b")?.color).toEqual(forward.get("b")?.color);
+  });
+});
+
+describe("getStarDisplayStyles", () => {
+  const sol = makeStar({ id: "sol", visualMagnitude: -26.74, colorIndexBv: 0.65 });
+  const bright = makeStar({ id: "bright", visualMagnitude: -0.1, colorIndexBv: 0.5 });
+  const faint = makeStar({ id: "faint", visualMagnitude: 4.43, colorIndexBv: 0.82 });
+
+  it("gives the brightest star the largest size and the faintest the smallest", () => {
+    const styles = getStarDisplayStyles([sol, bright, faint]);
+    expect(styles.get("sol")?.size).toBeGreaterThan(styles.get("bright")?.size ?? 0);
+    expect(styles.get("bright")?.size).toBeGreaterThan(styles.get("faint")?.size ?? 0);
+  });
+
+  it("keeps the brightest star from swallowing the field", () => {
+    // Sol is ~10^10 brighter than Alpha Centauri. Size must be compressed so
+    // the other systems stay legible next to it.
+    const styles = getStarDisplayStyles([sol, bright, faint]);
+    const ratio = (styles.get("sol")?.size ?? 0) / (styles.get("faint")?.size ?? 1);
+    expect(ratio).toBeLessThan(6);
+  });
+
+  it("never renders any star at zero size", () => {
+    const styles = getStarDisplayStyles([faint]);
+    expect(styles.get("faint")?.size).toBeGreaterThan(0);
+  });
+
+  it("handles a star with no recorded magnitude", () => {
+    const styles = getStarDisplayStyles([sol, makeStar({ id: "unknown" })]);
+    expect(styles.get("unknown")?.size).toBeGreaterThan(0);
+  });
+
+  it("handles a dataset where every magnitude is identical", () => {
+    const a = makeStar({ id: "a", visualMagnitude: 3 });
+    const b = makeStar({ id: "b", visualMagnitude: 3 });
+    const styles = getStarDisplayStyles([a, b]);
+    expect(Number.isFinite(styles.get("a")?.size)).toBe(true);
+    expect(styles.get("a")?.size).toBeGreaterThan(0);
+  });
+});
+
+describe("buildStarPointAttributes", () => {
+  it("packs one position, colour, and size per star", () => {
+    const stars = [
+      { ...makeStar({ id: "a" }), position: { x: 1, y: 2, z: 3 } },
+      { ...makeStar({ id: "b" }), position: { x: 4, y: 5, z: 6 } },
+    ];
+    const attributes = buildStarPointAttributes(stars);
+    expect(attributes.positions).toHaveLength(6);
+    expect(attributes.colors).toHaveLength(6);
+    expect(attributes.sizes).toHaveLength(2);
+    expect(attributes.ids).toEqual(["a", "b"]);
+    expect(attributes.positions[3]).toBe(4);
+  });
+
+  it("produces an empty but valid buffer set for no stars", () => {
+    const attributes = buildStarPointAttributes([]);
+    expect(attributes.positions).toHaveLength(0);
+    expect(attributes.ids).toEqual([]);
+  });
+});
 
 describe("computeSceneFraming", () => {
   it("returns a safe framing with no stars instead of dividing by zero", () => {
