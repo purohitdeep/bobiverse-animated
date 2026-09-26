@@ -13,6 +13,7 @@ import {
   clampYearToBounds,
   computeSceneFraming,
   createSeededRandom,
+  getFocusFraming,
   getNiceDistanceStep,
   getStarColor,
   getStarColorFromTemperature,
@@ -120,6 +121,49 @@ function makeSegment(
     ...overrides,
   };
 }
+
+describe("getFocusFraming", () => {
+  const framing = computeSceneFraming([
+    { position: { x: 0, y: 0, z: 0 } },
+    { position: { x: 3, y: 0, z: 0 } },
+    { position: { x: 0, y: 0, z: 6 } },
+  ]);
+
+  const origin = { id: "sol", position: { x: 0, y: 0, z: 0 } };
+  const far = { id: "far", position: { x: 0, y: 0, z: 6 } };
+
+  it("shows the whole field when the origin is focused", () => {
+    expect(getFocusFraming(origin, [origin, far], framing).distance).toBe(
+      framing.cameraDistance,
+    );
+  });
+
+  it("moves in closer for a system that is not the origin", () => {
+    const focus = getFocusFraming(far, [origin, far], framing);
+    expect(focus.distance).toBeLessThan(framing.cameraDistance);
+    expect(focus.distance).toBeGreaterThan(0);
+  });
+
+  it("keeps a focused system in view of its nearest neighbour", () => {
+    // A framing that cannot see the nearest neighbour is useless context.
+    const focus = getFocusFraming(far, [origin, far], framing);
+    const distanceToNeighbour = Math.hypot(0, 0, 6);
+    expect(focus.distance).toBeGreaterThanOrEqual(distanceToNeighbour * 0.5);
+  });
+
+  it("never lets the camera dolly inside the focused system", () => {
+    const focus = getFocusFraming(far, [origin, far], framing);
+    expect(focus.minDistance).toBeGreaterThan(0);
+    expect(focus.minDistance).toBeLessThan(focus.distance);
+  });
+
+  it("keeps the dolly range ordered and finite for a lone system", () => {
+    const lone = getFocusFraming(origin, [origin], framing);
+    expect(lone.minDistance).toBeLessThan(lone.distance);
+    expect(lone.maxDistance).toBeGreaterThan(lone.distance);
+    expect(Number.isFinite(lone.maxDistance)).toBe(true);
+  });
+});
 
 describe("getNiceDistanceStep", () => {
   it("picks a round step that covers the range in a few bands", () => {

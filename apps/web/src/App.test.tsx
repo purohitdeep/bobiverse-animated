@@ -178,4 +178,21 @@ describe("shareable view state", () => {
       expect(currentParams().get("year")).toBe("2144.6");
     });
   });
+
+  it("renders camera zoom controls that are safe before the scene loads", async () => {
+    render(<App />);
+
+    const zoom = await screen.findByRole("group", { name: "Camera zoom" });
+    expect(within(zoom).getByRole("button", { name: "Zoom in" })).toBeTruthy();
+    expect(within(zoom).getByRole("button", { name: "Zoom out" })).toBeTruthy();
+    expect(
+      within(zoom).getByRole("button", { name: /Frame the whole neighbourhood/ }),
+    ).toBeTruthy();
+
+    // The 3D scene is lazy, so there may be no camera to drive yet. Clicking
+    // must be a no-op rather than throwing.
+    fireEvent.click(within(zoom).getByRole("button", { name: "Zoom in" }));
+    fireEvent.click(within(zoom).getByRole("button", { name: "Frame the whole neighbourhood" }));
+    expect(screen.getByLabelText("Reading controls")).toBeTruthy();
+  });
 });

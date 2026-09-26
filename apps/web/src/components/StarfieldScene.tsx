@@ -29,6 +29,7 @@ import {
   buildDistanceRings,
   buildStarPointAttributes,
   computeSceneFraming,
+  getFocusFraming,
   getNiceDistanceStep,
   type BobInstanceState,
   type SceneStarNode,
@@ -72,6 +73,8 @@ interface StarfieldSceneProps {
   settings?: SceneSettings;
   /** Called when the GPU drops the context, so the app can fall back. */
   onContextLost?: () => void;
+  /** Receives the camera controls so the surrounding UI can drive them. */
+  cameraApiRef?: React.RefObject<SceneCameraApi | null>;
 }
 
 /**
@@ -440,21 +443,161 @@ function BobMarker({
  * selecting it shows the whole field, while selecting a distant system moves
  * in close enough to read its markers.
  */
-function CameraFocus({
-  selectedStar,
-  cameraDistance,
+/** Structural view of the orbit controls the controller needs. */
+interface ControlsImpl {
+  target: Vector3;
+  update: () => void;
+  enabled: boolean;
+}
+
+/** Imperative camera controls driven by the toolbar and keyboard shortcuts. */
+export interface SceneCameraApi {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  reset: () => void;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+/** Where the camera sits relative to what it is looking at. */
+const CAMERA_DIRECTION = new Vector3(0.82, 0.5, 0.82).normalize();
+const TRANSITION_SECONDS = 0.7;
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+interface CameraTween {
+  fromPosition: Vector3;
+  toPosition: Vector3;
+  fromTarget: Vector3;
+  toTarget: Vector3;
+  elapsed: number;
+}
+
+/**
+ * Drives the camera and keeps OrbitControls in sync with it.
+ *
+ * The previous version remounted OrbitControls on every selection change,
+ * which reset its internal state and made an animated transition impossible,
+ * so focusing a system was a hard jump. Here the controls are made default
+ * and the camera is tweened toward its new pose; once a tween finishes the
+ * reader has the controls back and can orbit freely.
+ *
+ * Starting the tween inside the frame loop rather than an effect avoids
+ * depending on the controls having registered themselves yet.
+ */
+function CameraController({
+  focus,
+  reducedMotion,
+  cameraApiRef,
 }: {
-  selectedStar: SceneStarNode;
-  cameraDistance: number;
+  focus: { id: string; position: Vector3; distance: number; minDistance: number; maxDistance: number };
+  reducedMotion: boolean;
+  cameraApiRef: React.RefObject<SceneCameraApi | null>;
 }) {
   const camera = useThree((state) => state.camera);
-  const { x, y, z } = selectedStar.position;
-  const distance = selectedStar.id === "sol" ? cameraDistance : cameraDistance * 0.62;
+  const controls = useThree((state) => state.controls) as ControlsImpl | null;
 
+  const tween = useRef<CameraTween | null>(null);
+  const appliedKey = useRef<string | null>(null);
+  // The frame loop and the imperative API both need the latest focus without
+  // re-subscribing, so it is mirrored into a ref after render.
+  const focusRef = useRef(focus);
   useEffect(() => {
-    camera.position.set(x + distance * 0.82, y + distance * 0.5, z + distance * 0.82);
-    camera.lookAt(new Vector3(x, y, z));
-  }, [camera, selectedStar.id, x, y, z, distance]);
+    focusRef.current = focus;
+  }, [focus]);
+
+  const animateTo = useCallback(
+    (position: Vector3, target: Vector3, instant: boolean) => {
+      if (instant) {
+        camera.position.copy(position);
+        if (controls) {
+          controls.target.copy(target);
+          controls.update();
+        }
+        tween.current = null;
+        return;
+      }
+      tween.current = {
+        fromPosition: camera.position.clone(),
+        toPosition: position.clone(),
+        fromTarget: (controls?.target ?? target).clone(),
+        toTarget: target.clone(),
+        elapsed: 0,
+      };
+    },
+    [camera, controls],
+  );
+
+  const dolly = useCallback(
+    (factor: number) => {
+      const current = focusRef.current;
+      const center = controls?.target ?? new Vector3();
+      const offset = camera.position.clone().sub(center);
+      const length = offset.length();
+      if (length <= 0) return;
+      const next = clamp(
+        length * factor,
+        current.minDistance,
+        current.maxDistance,
+      );
+      camera.position.copy(center.clone().add(offset.setLength(next)));
+      if (controls) controls.update();
+    },
+    [camera, controls],
+  );
+
+  // Expose the imperative API the toolbar and keyboard shortcuts drive.
+  useEffect(() => {
+    cameraApiRef.current = {
+      zoomIn: () => dolly(0.7),
+      zoomOut: () => dolly(1.45),
+      reset: () => {
+        const current = focusRef.current;
+        animateTo(
+          current.position.clone().add(
+            CAMERA_DIRECTION.clone().multiplyScalar(current.maxDistance * 0.5),
+          ),
+          current.position,
+          reducedMotion,
+        );
+      },
+    };
+    return () => {
+      cameraApiRef.current = null;
+    };
+  }, [cameraApiRef, dolly, animateTo, reducedMotion]);
+
+  useFrame((_, delta) => {
+    if (!controls) return;
+
+    const current = focusRef.current;
+    const key = `${current.id}:${current.position.x.toFixed(3)}:${current.distance.toFixed(3)}`;
+    if (appliedKey.current !== key) {
+      appliedKey.current = key;
+      animateTo(
+        current.position.clone().add(
+          CAMERA_DIRECTION.clone().multiplyScalar(current.distance),
+        ),
+        current.position,
+        reducedMotion,
+      );
+    }
+
+    const active = tween.current;
+    if (!active) return;
+    active.elapsed = Math.min(active.elapsed + delta, TRANSITION_SECONDS);
+    const progress = easeInOutCubic(active.elapsed / TRANSITION_SECONDS);
+    camera.position.lerpVectors(active.fromPosition, active.toPosition, progress);
+    controls.target.lerpVectors(active.fromTarget, active.toTarget, progress);
+    controls.update();
+    if (active.elapsed >= TRANSITION_SECONDS) {
+      tween.current = null;
+    }
+  });
 
   return null;
 }
@@ -595,6 +738,7 @@ export function StarfieldScene({
   onSelectStar,
   settings = DEFAULT_SCENE_SETTINGS,
   onContextLost,
+  cameraApiRef: providedCameraApiRef,
 }: StarfieldSceneProps) {
   const reducedMotion = useReducedMotion();
   const [webglAvailable] = useState(supportsWebGL);
@@ -605,6 +749,9 @@ export function StarfieldScene({
   // directly rather than failing inside the render pipeline.
   const postProcessing =
     settings.postProcessing && !contextLost && supportsPostProcessing(readDeviceCapabilities());
+
+  const internalCameraApiRef = useRef<SceneCameraApi | null>(null);
+  const cameraApiRef = providedCameraApiRef ?? internalCameraApiRef;
   const starPositionsById = useMemo(
     () =>
       new Map(
@@ -639,6 +786,23 @@ export function StarfieldScene({
   }, [onContextLost]);
 
   if (!selectedStar) return null;
+  // Per-system framing: the origin shows the whole neighbourhood, anything
+  // else moves in while keeping its nearest neighbour in view. Computed after
+  // the guard above, so the selected system is known to exist.
+  const focusFraming = getFocusFraming(selectedStar, stars, framing);
+  const focusPose = {
+    id: selectedStar.id,
+    position: new Vector3(
+      selectedStar.position.x,
+      selectedStar.position.y,
+      selectedStar.position.z,
+    ),
+    distance: focusFraming.distance,
+    minDistance: focusFraming.minDistance,
+    maxDistance: focusFraming.maxDistance,
+  };
+
+
 
   if (!webglAvailable || contextLost) {
     return (
@@ -751,25 +915,24 @@ export function StarfieldScene({
         />
       ))}
 
-      <CameraFocus
-        selectedStar={selectedStar}
-        cameraDistance={framing.cameraDistance}
+      <CameraController
+        focus={focusPose}
+        reducedMotion={reducedMotion}
+        cameraApiRef={cameraApiRef}
       />
       {/* Orbit is constrained so the reader cannot rotate into a view where
           the layout is unreadable or below the reference plane. */}
       <OrbitControls
-        key={selectedStarId}
+        makeDefault
         enableDamping
-        dampingFactor={0.08}
-        minDistance={framing.cameraDistance * 0.25}
-        maxDistance={framing.cameraDistance * 2.2}
+        dampingFactor={0.075}
+        zoomSpeed={0.8}
+        rotateSpeed={0.55}
+        panSpeed={0.6}
+        minDistance={focusPose.minDistance}
+        maxDistance={focusPose.maxDistance}
         minPolarAngle={0.05}
         maxPolarAngle={1.25}
-        target={[
-          selectedStar.position.x,
-          selectedStar.position.y,
-          selectedStar.position.z,
-        ]}
       />
       </Canvas>
       <SchematicOverlay

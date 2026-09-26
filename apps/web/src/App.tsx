@@ -42,6 +42,7 @@ import { ScopeSelector } from "./components/ScopeSelector";
 import { SystemDirectory } from "./components/SystemDirectory";
 import { TimelineSlider } from "./components/TimelineSlider";
 import { useStarMapStore } from "./store/useStarMapStore";
+import type { SceneCameraApi } from "./components/StarfieldScene";
 import {
   resolveInitialSceneSettings,
   writeSceneSettings,
@@ -107,6 +108,8 @@ function App() {
   const [sceneSettings, setSceneSettings] = useState<SceneSettings>(() =>
     resolveInitialSceneSettings(),
   );
+  // Populated by the 3D scene once it mounts; ignored when WebGL is absent.
+  const cameraApiRef = useRef<SceneCameraApi | null>(null);
   const hasHydratedViewRef = useRef(false);
   // Holds a deep link until the live frame matches it. This prevents the
   // writer below from clobbering a shared URL with pre-hydration defaults,
@@ -242,6 +245,19 @@ function App() {
       if (event.key === "Escape" && document.activeElement === searchInputRef.current) {
         setSearchQuery("");
         searchInputRef.current?.blur();
+        return;
+      }
+      const camera = cameraApiRef.current;
+      if (!camera) return;
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        camera.zoomIn();
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        camera.zoomOut();
+      } else if (event.key === "0") {
+        event.preventDefault();
+        camera.reset();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -637,6 +653,32 @@ function App() {
                   <span>LOCAL FRAME</span>
                   <strong>{formatAtlasYear(focalYear)}</strong>
                 </div>
+                <div className="scene-zoom-controls" role="group" aria-label="Camera zoom">
+                  <button
+                    type="button"
+                    onClick={() => cameraApiRef.current?.zoomIn()}
+                    aria-label="Zoom in"
+                    title="Zoom in (+)"
+                  >
+                    <span aria-hidden="true">+</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraApiRef.current?.zoomOut()}
+                    aria-label="Zoom out"
+                    title="Zoom out (−)"
+                  >
+                    <span aria-hidden="true">−</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraApiRef.current?.reset()}
+                    aria-label="Frame the whole neighbourhood"
+                    title="Frame all (0)"
+                  >
+                    <span aria-hidden="true">⤢</span>
+                  </button>
+                </div>
                 <div className="scene-corner scene-corner-bottom">
                   <span><i className="legend-dot star" /> System</span>
                   <span><i className="legend-dot bob" /> Replicant</span>
@@ -671,6 +713,7 @@ function App() {
                       bobs={bobInstances}
                       settings={sceneSettings}
                       onContextLost={() => setMapMode("directory")}
+                      cameraApiRef={cameraApiRef}
                       onSelectStar={setSelectedStarId}
                     />
                   </SceneErrorBoundary>

@@ -76,6 +76,65 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+export interface FocusFraming {
+  /** Distance from the focused system at which the camera should sit. */
+  distance: number;
+  /** Closest the camera may dolly without burying itself in the system. */
+  minDistance: number;
+  /** Farthest the camera may dolly out. */
+  maxDistance: number;
+}
+
+/**
+ * Chooses how far back the camera should sit when a system is focused.
+ *
+ * Sol is the origin of the neighbourhood, so focusing it means showing the
+ * whole field. Any other system is framed to include its nearest neighbour,
+ * which keeps a focused system in context instead of isolating it, while
+ * still moving the reader in closer than the overview.
+ */
+export function getFocusFraming(
+  star: { id: string; position: CartesianCoordinate },
+  stars: Array<{ id: string; position: CartesianCoordinate }>,
+  framing: SceneFraming,
+): FocusFraming {
+  const isOrigin = star.id === "sol";
+  const neighbours = stars.filter((other) => other.id !== star.id);
+
+  let nearest = framing.radius;
+  for (const other of neighbours) {
+    nearest = Math.min(
+      nearest,
+      Math.hypot(
+        other.position.x - star.position.x,
+        other.position.y - star.position.y,
+        other.position.z - star.position.z,
+      ),
+    );
+  }
+
+  // A focused system is capped below the overview distance. Framing strictly
+  // to include the nearest neighbour would otherwise pin almost every system
+  // to the overview distance, since the outer systems are widely spaced, and
+  // focusing would never actually move the reader in.
+  const overviewCeiling = framing.cameraDistance * 0.72;
+  const distance = isOrigin
+    ? framing.cameraDistance
+    : clamp(
+        Math.max(nearest * 1.4, framing.cameraDistance * 0.35),
+        framing.cameraDistance * 0.3,
+        overviewCeiling,
+      );
+
+  return {
+    distance,
+    // Never closer than a fraction of the framing distance, so a dolly
+    // cannot put the camera inside the system it is looking at.
+    minDistance: Math.max(distance * 0.14, framing.radius * 0.08),
+    maxDistance: framing.cameraDistance * 2.2,
+  };
+}
+
 export interface DistanceRing {
   /** Ring radius in light-years. */
   ly: number;
