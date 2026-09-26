@@ -115,6 +115,7 @@ export function TimelineSlider({
         id="year-range"
         className="timeline-range"
         type="range"
+        aria-label="Story year"
         min={String(bounds.startYear)}
         max={String(bounds.endYear)}
         step="0.1"

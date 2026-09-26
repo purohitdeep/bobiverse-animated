@@ -36,12 +36,19 @@ import {
   type AtlasSearchResult,
 } from "@bobiverse/simulation";
 import "./App.css";
-import { InspectorPanel, type InspectorTab } from "./components/InspectorPanel";
+import { InspectorPanel } from "./components/InspectorPanel";
 import { SceneErrorBoundary } from "./components/SceneErrorBoundary";
 import { ScopeSelector } from "./components/ScopeSelector";
 import { SystemDirectory } from "./components/SystemDirectory";
 import { TimelineSlider } from "./components/TimelineSlider";
 import { useStarMapStore } from "./store/useStarMapStore";
+import {
+  hasCaughtUpWithViewState,
+  readViewState,
+  writeViewState,
+  type AtlasViewState,
+  type InspectorTab,
+} from "./store/viewState";
 
 const LazyStarfieldScene = lazy(() =>
   import("./components/StarfieldScene").then((module) => ({
@@ -91,9 +98,17 @@ function App() {
   const [mapMode, setMapMode] = useState<"spatial" | "directory">("spatial");
   const [searchQuery, setSearchQuery] = useState("");
   const hasHydratedViewRef = useRef(false);
-  const pendingUrlHydrationRef = useRef(false);
+  // Holds a deep link until the live frame matches it. This prevents the
+  // writer below from clobbering a shared URL with pre-hydration defaults,
+  // and is cleared once matched so every later edit is mirrored instead.
+  const pendingViewStateRef = useRef<AtlasViewState | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const initialFocalYear = useRef(focalYear);
+  const initialFrame = useRef({
+    bookId: selectedBookId,
+    scopeId: selectedChapterScopeId,
+    starId: selectedStarId,
+    year: focalYear,
+  });
 
   const sceneStarNodes = useMemo(
     () => buildSceneStarNodes(seedStarSystems),
@@ -224,39 +239,26 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedScope = getChapterScopeById(
-      manifestChapterScopes,
-      params.get("scope") ?? "",
-    );
-    const requestedBook =
-      manifestBooks.find((book) => book.id === params.get("book")) ??
-      manifestBooks.find((book) => book.id === requestedScope?.bookId);
-    const safeScope =
-      requestedScope && requestedScope.bookId === requestedBook?.id
-        ? requestedScope
-        : getBookChapterScopes(
-            manifestChapterScopes,
-            requestedBook?.id ?? "we-are-legion",
-          )[0] ?? manifestChapterScopes[0];
-    pendingUrlHydrationRef.current = true;
-    const requestedStar = params.get("star");
-    const yearParam = params.get("year");
-    const requestedYear = yearParam === null ? Number.NaN : Number(yearParam);
+    const resolved = readViewState({
+      search: window.location.search,
+      books: manifestBooks,
+      chapterScopes: manifestChapterScopes,
+      starIds: sceneStarNodes.map((star) => star.id),
+      fallbackBookId: initialFrame.current.bookId,
+      fallbackStarId: initialFrame.current.starId,
+      fallbackYear: initialFrame.current.year,
+    });
 
-    if (safeScope) {
-      setSelectedBookId(safeScope.bookId);
-      setSelectedChapterScopeId(safeScope.id);
-      const bounds = getScopeTimelineBounds(manifestBooks, safeScope);
-      setFocalYear(
-        Number.isFinite(requestedYear)
-          ? clampYearToBounds(requestedYear, bounds)
-          : clampYearToBounds(initialFocalYear.current, bounds),
-      );
+    if (resolved) {
+      pendingViewStateRef.current = resolved;
+      setSelectedBookId(resolved.bookId);
+      setSelectedChapterScopeId(resolved.scopeId);
+      setSelectedStarId(resolved.starId);
+      setFocalYear(resolved.year);
+      setSelectedEventId(resolved.eventId);
+      setActiveInspectorTab(resolved.tab);
     }
-    if (requestedStar && sceneStarNodes.some((star) => star.id === requestedStar)) {
-      setSelectedStarId(requestedStar);
-    }
+
     hasHydratedViewRef.current = true;
   }, [
     manifestBooks,
@@ -269,49 +271,46 @@ function App() {
   ]);
 
   useEffect(() => {
-    if (
-      !hasHydratedViewRef.current ||
-      !pendingUrlHydrationRef.current ||
-      !selectedScope ||
-      !activeStar
-    ) {
+    if (!hasHydratedViewRef.current || !selectedScope || !activeStar) {
       return;
     }
 
-    const currentParams = new URLSearchParams(window.location.search);
-    const requestedBook = currentParams.get("book");
-    const requestedScope = getChapterScopeById(
-      manifestChapterScopes,
-      currentParams.get("scope") ?? "",
+    const current: AtlasViewState = {
+      bookId: selectedScope.bookId,
+      scopeId: selectedScope.id,
+      starId: activeStar.id,
+      year: focalYear,
+      eventId: selectedEventId,
+      tab: activeInspectorTab,
+    };
+
+    const pending = pendingViewStateRef.current;
+    if (pending) {
+      // A shared link has not been applied to the frame yet. Leave the URL
+      // alone until it has, so the defaults cannot overwrite it.
+      if (!hasCaughtUpWithViewState(current, pending)) {
+        return;
+      }
+      pendingViewStateRef.current = null;
+    }
+
+    const nextSearch = writeViewState(current);
+    if (nextSearch === window.location.search) {
+      return;
+    }
+
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${nextSearch}${window.location.hash}`,
     );
-    const requestedStar = currentParams.get("star");
-    const yearParam = currentParams.get("year");
-    const requestedYear = yearParam === null ? Number.NaN : Number(yearParam);
-    const hasValidScopeRequest =
-      requestedScope !== null && requestedScope.bookId === requestedBook;
-    const hasValidStarRequest =
-      requestedStar !== null &&
-      sceneStarNodes.some((star) => star.id === requestedStar);
-    const stateHasCaughtUp =
-      (!requestedBook || requestedBook === selectedScope.bookId) &&
-      (!hasValidScopeRequest || requestedScope.id === selectedScope.id) &&
-      (!hasValidStarRequest || requestedStar === activeStar.id) &&
-      (!Number.isFinite(requestedYear) ||
-        Math.abs(requestedYear - focalYear) < 0.01);
-
-    if (!stateHasCaughtUp) {
-      return;
-    }
-
-    pendingUrlHydrationRef.current = false;
-    const params = new URLSearchParams();
-    params.set("book", selectedScope.bookId);
-    params.set("scope", selectedScope.id);
-    params.set("year", focalYear.toFixed(1));
-    params.set("star", activeStar.id);
-    const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
-    window.history.replaceState(null, "", nextUrl);
-  }, [activeStar, focalYear, manifestChapterScopes, sceneStarNodes, selectedScope]);
+  }, [
+    activeInspectorTab,
+    activeStar,
+    focalYear,
+    selectedEventId,
+    selectedScope,
+  ]);
 
   useEffect(() => {
     if (!isPlaying) return;

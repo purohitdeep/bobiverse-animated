@@ -7,8 +7,9 @@ import {
   type TravelSegmentState,
 } from "@bobiverse/simulation";
 import { EventLogPanel } from "./EventLogPanel";
+import { INSPECTOR_TABS, type InspectorTab } from "../store/viewState";
 
-export type InspectorTab = "overview" | "events" | "cast" | "sources";
+export type { InspectorTab };
 
 interface InspectorPanelProps {
   activeTab: InspectorTab;
@@ -27,12 +28,10 @@ interface InspectorPanelProps {
   onSelectStar: (starId: string) => void;
 }
 
-const TABS: Array<{ id: InspectorTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "events", label: "Story" },
-  { id: "cast", label: "Cast" },
-  { id: "sources", label: "Sources" },
-];
+const TABS = INSPECTOR_TABS.map((id) => ({
+    id,
+    label: id === "overview" ? "Overview" : id === "events" ? "Story" : id === "cast" ? "Cast" : "Sources",
+}));
 
 function formatStatus(status: ReviewStatus) {
   return status.replace(/-/g, " ");
