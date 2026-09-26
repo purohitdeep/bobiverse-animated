@@ -76,6 +76,10 @@ export function buildSceneStarNodes(
   });
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 export function getNeighborhoodSummary(stars: StarSystem[]) {
   const farthestStar = [...stars].sort(
     (left, right) => right.distanceLy - left.distanceLy,
@@ -85,6 +89,130 @@ export function getNeighborhoodSummary(stars: StarSystem[]) {
     count: stars.length,
     farthestStar: farthestStar?.name ?? "Unknown",
     spanLy: farthestStar?.distanceLy ?? 0,
+  };
+}
+
+export interface SceneFraming {
+  /** Centre of the bounding sphere that contains every star. */
+  center: CartesianCoordinate;
+  /** Radius of that bounding sphere. Never zero, so callers can scale safely. */
+  radius: number;
+  /** Distance from the centre at which the whole field is comfortably framed. */
+  cameraDistance: number;
+  /**
+   * Fog is measured from the camera, not from the origin, so the range is
+   * derived from where the camera actually sits. A fixed range either does
+   * nothing or swallows the scene depending on the content.
+   */
+  fogNear: number;
+  fogFar: number;
+}
+
+export interface SceneFramingOptions {
+  fovDegrees?: number;
+  /**
+   * How much of the viewport half-angle the bounding sphere should occupy.
+   * Below 1 the sphere is comfortably inside the frame rather than touching
+   * the edges, which is what a usable default view needs.
+   */
+  fillFactor?: number;
+  minRadius?: number;
+  minDistance?: number;
+  maxDistance?: number;
+}
+
+/**
+ * Derives camera distance, fog range, and framing centre from the stars that
+ * are actually present.
+ *
+ * Hardcoded scene constants break as soon as the content changes: a grid
+ * sized for one dataset dwarfs another, and a fog range starting beyond the
+ * farthest star has no effect at all. Everything here is a function of the
+ * content so the default view is always correct.
+ */
+export function computeSceneFraming(
+  stars: Array<{ position: CartesianCoordinate }>,
+  options: SceneFramingOptions = {},
+): SceneFraming {
+  const {
+    fovDegrees = 42,
+    fillFactor = 0.6,
+    minRadius = 1,
+    minDistance = 3,
+    maxDistance = 26,
+  } = options;
+
+  if (stars.length === 0) {
+    return {
+      center: { x: 0, y: 0, z: 0 },
+      radius: minRadius,
+      cameraDistance: clamp(minRadius * 3, minDistance, maxDistance),
+      fogNear: minRadius * 3,
+      fogFar: minRadius * 12,
+    };
+  }
+
+  const min = { x: Infinity, y: Infinity, z: Infinity };
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (const star of stars) {
+    min.x = Math.min(min.x, star.position.x);
+    min.y = Math.min(min.y, star.position.y);
+    min.z = Math.min(min.z, star.position.z);
+    max.x = Math.max(max.x, star.position.x);
+    max.y = Math.max(max.y, star.position.y);
+    max.z = Math.max(max.z, star.position.z);
+  }
+
+  const center = {
+    x: (min.x + max.x) / 2,
+    y: (min.y + max.y) / 2,
+    z: (min.z + max.z) / 2,
+  };
+
+  let radius = 0;
+  for (const star of stars) {
+    radius = Math.max(
+      radius,
+      Math.hypot(
+        star.position.x - center.x,
+        star.position.y - center.y,
+        star.position.z - center.z,
+      ),
+    );
+  }
+  radius = Math.max(radius, minRadius);
+
+  // Distance at which a sphere of this radius subtends the requested angle.
+  const halfFov = (fovDegrees / 2) * (Math.PI / 180);
+  const halfFovSine = Math.max(Math.sin(halfFov), 1e-6);
+  const cameraDistance = clamp(
+    (radius / halfFovSine) * fillFactor,
+    minDistance,
+    maxDistance,
+  );
+
+  return {
+    center,
+    radius,
+    cameraDistance,
+    fogNear: cameraDistance + radius * 0.25,
+    fogFar: cameraDistance + radius * 2,
+  };
+}
+
+/**
+ * Deterministic pseudo-random generator (mulberry32). The backdrop is
+ * procedurally generated, and it must look identical on every load and in
+ * every test run, so it cannot use `Math.random`.
+ */
+export function createSeededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return function next() {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 

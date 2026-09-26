@@ -9,6 +9,8 @@ import type {
 } from "@bobiverse/domain";
 import {
   clampYearToBounds,
+  computeSceneFraming,
+  createSeededRandom,
   getScopedBobInstances,
   getScopedStarNote,
   getScopedTimelineEvents,
@@ -111,6 +113,73 @@ function makeSegment(
     ...overrides,
   };
 }
+
+describe("computeSceneFraming", () => {
+  it("returns a safe framing with no stars instead of dividing by zero", () => {
+    const framing = computeSceneFraming([]);
+    expect(framing.center).toEqual({ x: 0, y: 0, z: 0 });
+    expect(framing.radius).toBeGreaterThan(0);
+    expect(Number.isFinite(framing.cameraDistance)).toBe(true);
+    expect(framing.fogFar).toBeGreaterThan(framing.fogNear);
+  });
+
+  it("centres the bounding sphere on the content", () => {
+    const framing = computeSceneFraming([
+      { position: { x: -2, y: 0, z: 0 } },
+      { position: { x: 2, y: 0, z: 0 } },
+    ]);
+    expect(framing.center.x).toBeCloseTo(0);
+    expect(framing.radius).toBeCloseTo(2);
+  });
+
+  it("keeps fog inside a range that actually spans the star field", () => {
+    // A fog range that starts beyond the framing distance hides nothing and
+    // reads as a bug; this is the failure the derived range exists to prevent.
+    const framing = computeSceneFraming([
+      { position: { x: 0, y: 0, z: 0 } },
+      { position: { x: 5, y: 0, z: 0 } },
+    ]);
+    expect(framing.fogNear).toBeGreaterThan(framing.cameraDistance);
+    expect(framing.fogFar).toBeGreaterThan(framing.cameraDistance + framing.radius);
+  });
+
+  it("pulls the camera back as the content grows", () => {
+    const small = computeSceneFraming([{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 1, y: 0, z: 0 } }]);
+    const large = computeSceneFraming([{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 20, y: 0, z: 0 } }]);
+    expect(large.cameraDistance).toBeGreaterThan(small.cameraDistance);
+  });
+
+  it("keeps a single star from collapsing the framing", () => {
+    const framing = computeSceneFraming([{ position: { x: 1, y: 1, z: 1 } }]);
+    expect(framing.radius).toBeGreaterThanOrEqual(1);
+    expect(framing.cameraDistance).toBeGreaterThan(0);
+  });
+});
+
+describe("createSeededRandom", () => {
+  it("is deterministic for the same seed", () => {
+    const a = createSeededRandom(42);
+    const b = createSeededRandom(42);
+    const first = [a(), a(), a()];
+    const second = [b(), b(), b()];
+    expect(first).toEqual(second);
+  });
+
+  it("produces different sequences for different seeds", () => {
+    const a = createSeededRandom(1);
+    const b = createSeededRandom(2);
+    expect(a()).not.toBe(b());
+  });
+
+  it("stays within [0, 1)", () => {
+    const next = createSeededRandom(7);
+    for (let i = 0; i < 200; i++) {
+      const value = next();
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThan(1);
+    }
+  });
+});
 
 describe("toCartesianCoordinate", () => {
   it("places a star at the origin when distance is zero", () => {
