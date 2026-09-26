@@ -1,55 +1,53 @@
 @import "./design-system.css";
 
 :root {
-  color: var(--color-text);
-  background:
-    radial-gradient(
-      circle at top left,
-      rgba(204, 150, 100, 0.28),
-      transparent 32%
-    ),
-    radial-gradient(
-      circle at 85% 10%,
-      rgba(114, 128, 95, 0.16),
-      transparent 24%
-    ),
-    linear-gradient(180deg, #f4ebde 0%, #ecdfcd 55%, #e4d3bc 100%);
+  color: var(--color-text-on-dark);
+  background: var(--color-page);
   font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html,
-body,
-#root {
+html {
+  min-width: 320px;
   min-height: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
-  margin: 0;
+  min-width: 320px;
   min-height: 100vh;
-  color: var(--color-text);
+  margin: 0;
+  overflow-x: hidden;
+  color: var(--color-text-on-dark);
   background:
-    linear-gradient(rgba(112, 82, 58, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(112, 82, 58, 0.04) 1px, transparent 1px),
-    radial-gradient(
-      circle at top left,
-      rgba(204, 150, 100, 0.24),
-      transparent 34%
-    ),
-    linear-gradient(180deg, #f4ebde 0%, #ecdfcd 55%, #e4d3bc 100%);
-  background-size:
-    48px 48px,
-    48px 48px,
-    auto,
-    auto;
+    radial-gradient(circle at 12% 0%, rgba(57, 125, 131, 0.18), transparent 28rem),
+    radial-gradient(circle at 88% 16%, rgba(153, 84, 51, 0.12), transparent 24rem),
+    linear-gradient(180deg, #0b141b 0%, #0a1218 68%, #081016 100%);
+}
+
+body::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(143, 194, 193, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143, 194, 193, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  content: "";
+  mask-image: linear-gradient(180deg, black, transparent 75%);
+  pointer-events: none;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 button,
@@ -65,33 +63,16 @@ p {
   margin: 0;
 }
 
-h1 {
-  font-size: clamp(2.5rem, 4vw, 4.4rem);
-  line-height: 0.98;
-  letter-spacing: -0.05em;
-  font-family: var(--font-heading);
-}
-
-h2 {
-  font-size: 1.45rem;
-  line-height: 1.1;
-  font-family: var(--font-heading);
-}
-
-h3 {
-  font-family: var(--font-heading);
-}
-
-p,
-li,
-dd,
-dt,
+h1,
+h2,
+h3,
 button,
+a,
 input,
 select {
   font-family: var(--font-body);
 }
 
 a {
-  color: var(--color-accent-strong);
+  color: inherit;
 }

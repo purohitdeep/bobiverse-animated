@@ -17,7 +17,7 @@ export const useStarMapStore = create<StarMapState>((set) => ({
   // view cannot disclose late-story content.
   selectedBookId: "we-are-legion",
   selectedChapterScopeId: "book-1-arrival-epsilon-eridani",
-  focalYear: 2133,
+  focalYear: 2134,
   setSelectedStarId: (selectedStarId) => set({ selectedStarId }),
   setSelectedBookId: (selectedBookId) => set({ selectedBookId }),
   setSelectedChapterScopeId: (selectedChapterScopeId) =>
