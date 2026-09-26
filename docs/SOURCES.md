@@ -30,5 +30,7 @@ Secondary sources are allowed to help discover candidate facts or corroborate se
 
 1. Keep the knowledge-source catalog in the data layer.
 2. Fail validation when content references an unknown `sourceId`.
-3. Add stronger referential-integrity and timeline-consistency checks before expanding the dataset.
-4. Surface source status in the UI once the redesign moves source evidence into a user-facing panel.
+3. Audit provenance for stars, books, chapter scopes, events, replicants, and travel segments.
+4. Require explicit first-reveal scope metadata for narrative events, identities, routes, and scoped star annotations.
+5. Add stronger referential-integrity and timeline-consistency checks before expanding the dataset.
+6. Warn readers that secondary links can contain spoilers beyond the selected frontier.

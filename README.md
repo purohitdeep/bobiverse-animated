@@ -4,15 +4,17 @@ A modular web app for exploring Bobiverse star systems, timelines, and replicant
 
 ## Status
 
-Early foundation, actively built out. Working today:
+Research preview, actively built out. Working today:
 
-- Workspace structure with strict TypeScript checking across all packages
-- 3D neighborhood scene with selection and orbit controls
-- Seed star data with provenance, review states, and a source catalog
-- Chapter-scope controls that keep events spoiler-safe per reading frontier
-- A content audit plus referential-integrity validation that run in CI
+- Reader-first atlas shell with global search, linked system/map/event selection, and an accessible directory fallback
+- Spoiler-safe reading frontier controls with explicit curated chapter boundaries for Books 1–3
+- Deterministic time scrubbing, play/pause playback, event filters, linked event-to-map focus, and shareable URL state
+- 3D neighborhood scene with catalog coordinates, sourced routes, replicant markers, and explicit in-transit progress
+- Replicant ledger with identity, generation, lineage-ready records, and story-frame location state
+- Provenance and review surfaces for events, systems, identities, routes, and source links
+- Workspace-wide strict TypeScript, unit tests, content audit, referential-integrity validation, and CI
 
-Still missing: replicant (Bob) records and travel routes, content files on disk (seed data is in code), and per-chapter coverage beyond curated boundaries.
+Current coverage is intentionally honest: 3 books, 6 curated chapter boundaries, 7 systems, 10 provisional timeline events, 5 replicants, and 1 sourced journey (22 records awaiting primary-text review in total). Arbitrary chapter selection, primary-text fact-level locators, and a fully verified canon are not yet available. Seed content remains in TypeScript until the content-package loader is introduced.
 
 ## Requirements
 

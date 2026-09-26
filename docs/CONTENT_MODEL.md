@@ -7,9 +7,17 @@ The atlas should be content-driven.
 - `Book` - release metadata and reading order
 - `ChapterScope` - spoiler-safe timeline cutoffs
 - `StarSystem` - canonical stellar coordinates and source confidence
-- `BobInstance` - replicant identity, lineage, and lifecycle
-- `TravelSegment` - departure, arrival, and route state
-- `TimelineEvent` - dated story, tech, conflict, and movement events
+- `BobInstance` - replicant identity, lineage, lifecycle, and explicit first-reveal scope
+- `TravelSegment` - departure, arrival, route state, and explicit first-reveal scope
+- `TimelineEvent` - dated story, tech, conflict, and movement events with first-reveal scope
+
+## Disclosure Contract
+
+Story chronology and reader knowledge are separate. Every narrative entity must carry a `revealedInScopeId` (or an event's `chapterScopeId`) that defines when it may appear. Visibility must use that disclosure boundary first; it must not infer knowledge from the entity's year alone.
+
+A star's public catalog coordinates are always safe reference material. Any narrative annotation on a star is scoped separately with `noteScopeId` and stays hidden until that scope is inside the reader's frontier.
+
+Replicant world state is discriminated: `stationary`, `in-transit` (from, to, and progress), or `arrived`. A transit marker must never be presented as a stationary system resident.
 
 ## Provenance Standard
 
