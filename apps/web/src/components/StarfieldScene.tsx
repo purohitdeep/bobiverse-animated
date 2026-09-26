@@ -4,6 +4,7 @@ import type { Line2 } from "three/addons/lines/Line2.js";
 import {
   Suspense,
   lazy,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -18,6 +19,12 @@ import {
   Vector3,
 } from "three";
 import { GalacticBackdrop } from "./scene/GalacticBackdrop";
+import {
+  DEFAULT_SCENE_SETTINGS,
+  readDeviceCapabilities,
+  supportsPostProcessing,
+  type SceneSettings,
+} from "../scene/sceneSettings";
 import {
   buildDistanceRings,
   buildStarPointAttributes,
@@ -61,8 +68,10 @@ interface StarfieldSceneProps {
   events: TimelineEventState[];
   bobs: BobInstanceState[];
   onSelectStar: (starId: string) => void;
-  /** Post-processing needs WebGL2; it can be switched off on weaker devices. */
-  usePostProcessing?: boolean;
+  /** Effect toggles and quality tier; see sceneSettings. */
+  settings?: SceneSettings;
+  /** Called when the GPU drops the context, so the app can fall back. */
+  onContextLost?: () => void;
 }
 
 /**
@@ -215,6 +224,24 @@ function AnimatedRouteLine({
       gapSize={0.08}
     />
   );
+}
+
+/**
+ * Watches for the GPU dropping the WebGL context, which is otherwise a silent
+ * black screen. Reporting it lets the app fall back to the directory.
+ */
+function ContextLossGuard({ onLost }: { onLost: () => void }) {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handle = (event: Event) => {
+      event.preventDefault();
+      onLost();
+    };
+    canvas.addEventListener("webglcontextlost", handle);
+    return () => canvas.removeEventListener("webglcontextlost", handle);
+  }, [gl, onLost]);
+  return null;
 }
 
 function StarPoints({
@@ -566,12 +593,18 @@ export function StarfieldScene({
   events,
   bobs,
   onSelectStar,
-  usePostProcessing = true,
+  settings = DEFAULT_SCENE_SETTINGS,
+  onContextLost,
 }: StarfieldSceneProps) {
   const reducedMotion = useReducedMotion();
   const [webglAvailable] = useState(supportsWebGL);
+  const [contextLost, setContextLost] = useState(false);
   const selectedStar = stars.find((star) => star.id === selectedStarId) ?? stars[0];
   const framing = useMemo(() => computeSceneFraming(stars), [stars]);
+  // Bloom and the composer need WebGL2; a device without it runs the scene
+  // directly rather than failing inside the render pipeline.
+  const postProcessing =
+    settings.postProcessing && !contextLost && supportsPostProcessing(readDeviceCapabilities());
   const starPositionsById = useMemo(
     () =>
       new Map(
@@ -600,9 +633,14 @@ export function StarfieldScene({
     return counts;
   }, [bobs]);
 
+  const handleContextLost = useCallback(() => {
+    setContextLost(true);
+    onContextLost?.();
+  }, [onContextLost]);
+
   if (!selectedStar) return null;
 
-  if (!webglAvailable) {
+  if (!webglAvailable || contextLost) {
     return (
       <>
         <div className="scene-fallback" role="status">
@@ -666,11 +704,13 @@ export function StarfieldScene({
           line materials, and additive points), so lights had no effect. */}
 
       <Suspense fallback={null}>
-        <GalacticBackdrop
-          fieldRadius={framing.radius}
-          fieldCount={reducedMotion ? 1400 : 2200}
-        />
-        {usePostProcessing ? <LazyPostProcessing /> : null}
+        {settings.backdrop ? (
+          <GalacticBackdrop
+            fieldRadius={framing.radius}
+            fieldCount={reducedMotion ? 1400 : 2200}
+          />
+        ) : null}
+        {postProcessing ? <LazyPostProcessing /> : null}
       </Suspense>
 
       {travelSegments.map((segment) => {
@@ -688,8 +728,9 @@ export function StarfieldScene({
         );
       })}
 
-      <DistanceRings stars={stars} />
+      {settings.rings ? <DistanceRings stars={stars} /> : null}
 
+      <ContextLossGuard onLost={handleContextLost} />
       <StarPoints stars={stars} onSelectStar={onSelectStar} />
 
       {selectedStar ? <SelectedStarRing star={selectedStar} /> : null}

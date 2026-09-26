@@ -43,6 +43,11 @@ import { SystemDirectory } from "./components/SystemDirectory";
 import { TimelineSlider } from "./components/TimelineSlider";
 import { useStarMapStore } from "./store/useStarMapStore";
 import {
+  resolveInitialSceneSettings,
+  writeSceneSettings,
+  type SceneSettings,
+} from "./scene/sceneSettings";
+import {
   hasCaughtUpWithViewState,
   readViewState,
   writeViewState,
@@ -97,6 +102,11 @@ function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [mapMode, setMapMode] = useState<"spatial" | "directory">("spatial");
   const [searchQuery, setSearchQuery] = useState("");
+  // Effect toggles persist, so a reader who turned the render pipeline down
+  // on a slow machine is not asked to do it again on every visit.
+  const [sceneSettings, setSceneSettings] = useState<SceneSettings>(() =>
+    resolveInitialSceneSettings(),
+  );
   const hasHydratedViewRef = useRef(false);
   // Holds a deep link until the live frame matches it. This prevents the
   // writer below from clobbering a shared URL with pre-hydration defaults,
@@ -395,6 +405,14 @@ function App() {
     setIsPlaying((playing) => !playing);
   }
 
+  function handleToggleEffects() {
+    setSceneSettings((current) => {
+      const next = { ...current, postProcessing: !current.postProcessing };
+      writeSceneSettings(next);
+      return next;
+    });
+  }
+
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const firstResult = searchResults[0];
@@ -580,6 +598,15 @@ function App() {
                 </button>
                 <button
                   type="button"
+                  className={sceneSettings.postProcessing ? "active" : undefined}
+                  onClick={handleToggleEffects}
+                  aria-pressed={sceneSettings.postProcessing}
+                  title="Toggle bloom and the tone-mapping pipeline"
+                >
+                  <span aria-hidden="true">✧</span> Effects
+                </button>
+                <button
+                  type="button"
                   className="reset-view"
                   onClick={() => setSelectedStarId("sol")}
                   aria-label="Reset map view to Sol"
@@ -642,6 +669,8 @@ function App() {
                       travelSegments={travelSegments}
                       events={timelineEvents}
                       bobs={bobInstances}
+                      settings={sceneSettings}
+                      onContextLost={() => setMapMode("directory")}
                       onSelectStar={setSelectedStarId}
                     />
                   </SceneErrorBoundary>
