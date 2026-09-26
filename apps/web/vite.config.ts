@@ -8,4 +8,16 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1000,
   },
+  // The atlas is served on 6055 everywhere: local dev, preview, and the
+  // container all expose the same origin. strictPort fails loudly instead of
+  // silently sliding to another port, which would break a shared link.
+  server: {
+    port: 6055,
+    strictPort: true,
+    host: true,
+  },
+  preview: {
+    port: 6055,
+    strictPort: true,
+  },
 })
