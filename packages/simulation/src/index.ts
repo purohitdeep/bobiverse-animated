@@ -76,6 +76,79 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+export interface DistanceRing {
+  /** Ring radius in light-years. */
+  ly: number;
+  points: CartesianCoordinate[];
+}
+
+const NICE_DISTANCE_STEPS = [
+  0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 500,
+];
+
+/**
+ * Picks a human-friendly ring spacing that divides the visible range into
+ * roughly `targetRings` bands. Without this, ring labels read as arbitrary
+ * numbers like 7.3 ly, which defeats the purpose of a reference ring.
+ */
+export function getNiceDistanceStep(
+  maxDistanceLy: number,
+  targetRings = 4,
+): number {
+  if (!(maxDistanceLy > 0) || targetRings <= 0) {
+    return NICE_DISTANCE_STEPS[0] ?? 1;
+  }
+  const rawStep = maxDistanceLy / targetRings;
+  return (
+    NICE_DISTANCE_STEPS.find((step) => step >= rawStep) ??
+    NICE_DISTANCE_STEPS[NICE_DISTANCE_STEPS.length - 1] ??
+    1
+  );
+}
+
+/**
+ * Concentric reference rings centred on Sol, drawn in the plane the map is
+ * most readable in.
+ *
+ * The scene stores a star at `y = declination`, so the x/z plane is the
+ * top-down view. Measured against the current content, that projection
+ * separates the two systems which overlap in 3D roughly twice as well, and
+ * orders the systems outward by distance from Sol. Rings in that plane give
+ * that distance a readable scale without interpreting a 3D projection.
+ */
+export function buildDistanceRings(
+  stars: Array<{ distanceLy: number }>,
+  options: { segments?: number; targetRings?: number; scale?: number } = {},
+): DistanceRing[] {
+  const { segments = 96, targetRings = 4, scale = 0.18 } = options;
+
+  const maxDistanceLy = Math.max(0, ...stars.map((star) => star.distanceLy));
+  if (!(maxDistanceLy > 0)) {
+    return [];
+  }
+
+  const step = getNiceDistanceStep(maxDistanceLy, targetRings);
+  const rings: DistanceRing[] = [];
+
+  // Only rings inside the mapped range, so the reference never extends past
+  // the outermost system.
+  for (let ly = step; ly <= maxDistanceLy + 1e-9; ly += step) {
+    const radius = ly * scale;
+    const points: CartesianCoordinate[] = [];
+    for (let index = 0; index < segments; index += 1) {
+      const angle = (index / segments) * Math.PI * 2;
+      points.push({
+        x: Math.cos(angle) * radius,
+        y: 0,
+        z: Math.sin(angle) * radius,
+      });
+    }
+    rings.push({ ly, points });
+  }
+
+  return rings;
+}
+
 export interface StarColor {
   r: number;
   g: number;

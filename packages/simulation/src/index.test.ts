@@ -8,10 +8,12 @@ import type {
   TravelSegment,
 } from "@bobiverse/domain";
 import {
+  buildDistanceRings,
   buildStarPointAttributes,
   clampYearToBounds,
   computeSceneFraming,
   createSeededRandom,
+  getNiceDistanceStep,
   getStarColor,
   getStarColorFromTemperature,
   getStarDisplayStyles,
@@ -118,6 +120,61 @@ function makeSegment(
     ...overrides,
   };
 }
+
+describe("getNiceDistanceStep", () => {
+  it("picks a round step that covers the range in a few bands", () => {
+    // 29.5 ly across 4 bands is ~7.4, so the next round step is 10.
+    expect(getNiceDistanceStep(29.5, 4)).toBe(10);
+  });
+
+  it("shrinks the step for a small range", () => {
+    expect(getNiceDistanceStep(4, 4)).toBe(1);
+  });
+
+  it("stays safe for a degenerate range", () => {
+    expect(getNiceDistanceStep(0)).toBe(0.5);
+    expect(getNiceDistanceStep(-4)).toBe(0.5);
+    expect(Number.isFinite(getNiceDistanceStep(29.5, 0))).toBe(true);
+  });
+});
+
+describe("buildDistanceRings", () => {
+  it("returns nothing when every system is at the origin", () => {
+    expect(buildDistanceRings([{ distanceLy: 0 }])).toEqual([]);
+    expect(buildDistanceRings([])).toEqual([]);
+  });
+
+  it("never extends a ring past the outermost system", () => {
+    const rings = buildDistanceRings([{ distanceLy: 29.5 }]);
+    expect(rings.length).toBeGreaterThan(0);
+    for (const ring of rings) {
+      expect(ring.ly).toBeLessThanOrEqual(29.5);
+    }
+  });
+
+  it("spaces rings evenly from the step size", () => {
+    const rings = buildDistanceRings([{ distanceLy: 29.5 }]);
+    expect(rings[0]?.ly).toBe(10);
+    expect(rings.map((ring) => ring.ly)).toEqual([10, 20]);
+  });
+
+  it("draws each ring in the top-down plane as a closed circle", () => {
+    const [ring] = buildDistanceRings([{ distanceLy: 20 }], { segments: 8 });
+    expect(ring?.points).toHaveLength(8);
+    for (const point of ring?.points ?? []) {
+      expect(point.y).toBe(0);
+      expect(Math.hypot(point.x, point.z)).toBeCloseTo((ring?.ly ?? 0) * 0.18, 6);
+    }
+  });
+
+  it("scales ring radius with the scene projection scale", () => {
+    const [tight] = buildDistanceRings([{ distanceLy: 20 }], { scale: 0.18 });
+    const [wide] = buildDistanceRings([{ distanceLy: 20 }], { scale: 0.36 });
+    const radius = (ring: { points: Array<{ x: number; z: number }> } | undefined) =>
+      Math.hypot(ring?.points[0]?.x ?? 0, ring?.points[0]?.z ?? 0);
+    expect(radius(wide)).toBeCloseTo(radius(tight) * 2, 6);
+  });
+});
 
 describe("getStarEffectiveTemperature", () => {
   it("reproduces the solar effective temperature from the Sun's colour index", () => {

@@ -1,6 +1,14 @@
 import { Html, Line, OrbitControls } from "@react-three/drei";
-import { Canvas, useThree } from "@react-three/fiber";
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import type { Line2 } from "three/addons/lines/Line2.js";
+import {
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ACESFilmicToneMapping,
   AdditiveBlending,
@@ -11,8 +19,10 @@ import {
 } from "three";
 import { GalacticBackdrop } from "./scene/GalacticBackdrop";
 import {
+  buildDistanceRings,
   buildStarPointAttributes,
   computeSceneFraming,
+  getNiceDistanceStep,
   type BobInstanceState,
   type SceneStarNode,
   type TimelineEventState,
@@ -24,6 +34,7 @@ const scenePalette = {
   fog: "#10151c",
   route: "#69d5cf",
   routeDim: "#375e64",
+  ring: "#4a6b78",
   bob: "#f3a66d",
 };
 
@@ -102,6 +113,109 @@ const STAR_FRAGMENT_SHADER = /* glsl */ `
     gl_FragColor = vec4(vColor * intensity, 1.0);
   }
 `;
+
+/**
+ * Distance reference rings centred on Sol.
+ *
+ * Distance is the axis this dataset actually supports, and rings in the
+ * top-down plane give it a scale without interpreting a 3D projection. They
+ * are drawn flat and dim so they read as a measuring aid, never as content.
+ */
+function DistanceRings({ stars }: { stars: SceneStarNode[] }) {
+  const rings = useMemo(() => buildDistanceRings(stars), [stars]);
+  const labels = useMemo(() => {
+    const next = new Map<number, { x: number; z: number }>();
+    const spacing = getNiceDistanceStep(
+      Math.max(0, ...stars.map((star) => star.distanceLy)),
+    );
+    for (const ring of rings) {
+      // Place the label a third of the way round, away from the densest
+      // part of the field.
+      const point = ring.points[Math.floor(ring.points.length / 3)];
+      if (point) next.set(ring.ly, { x: point.x, z: point.z });
+    }
+    return { next, spacing };
+  }, [rings, stars]);
+
+  return (
+    <group>
+      {rings.map((ring) => (
+        <Line
+          key={ring.ly}
+          points={ring.points.map((point) => [point.x, point.y, point.z])}
+          color={scenePalette.ring}
+          lineWidth={0.6}
+          transparent
+          opacity={0.32}
+          depthWrite={false}
+        />
+      ))}
+      {[...labels.next.entries()].map(([ly, position]) => (
+        <Html
+          key={ly}
+          center
+          position={[position.x, 0, position.z]}
+          distanceFactor={8}
+          zIndexRange={[5, 0]}
+        >
+          <span className="ring-label">{ly} ly</span>
+        </Html>
+      ))}
+    </group>
+  );
+}
+
+/**
+ * A sourced route with a slow directional flow while it is in use.
+ *
+ * The flow is decorative: it signals direction and activity, and never
+ * claims to be the replicant's position. The replicant marker itself stays
+ * exactly where the story year puts it, because the atlas treats world state
+ * as a deterministic function of the selected frame. Animate along the
+ * route would contradict that contract.
+ */
+function AnimatedRouteLine({
+  from,
+  to,
+  state,
+  animate,
+}: {
+  from: Vector3;
+  to: Vector3;
+  state: "pre-departure" | "in-transit" | "arrived";
+  animate: boolean;
+}) {
+  const lineRef = useRef<Line2 | null>(null);
+  const isPreDeparture = state === "pre-departure";
+  const isInTransit = state === "in-transit";
+
+  useFrame((state_) => {
+    const material = lineRef.current?.material;
+    if (!material || !animate || !isInTransit) return;
+    material.dashOffset = -state_.clock.elapsedTime * 0.4;
+    material.needsUpdate = false;
+  });
+
+  return (
+    <Line
+      ref={lineRef as never}
+      points={[
+        [from.x, from.y, from.z],
+        [to.x, to.y, to.z],
+      ]}
+      color={isPreDeparture ? scenePalette.routeDim : scenePalette.route}
+      lineWidth={isPreDeparture ? 1.2 : 2.4}
+      transparent
+      // Depth testing is on: a route that draws straight through a star
+      // reads as a rendering fault rather than a journey.
+      depthWrite={false}
+      opacity={isPreDeparture ? 0.45 : 0.9}
+      dashed={isInTransit}
+      dashSize={0.14}
+      gapSize={0.08}
+    />
+  );
+}
 
 function StarPoints({
   stars,
@@ -564,24 +678,17 @@ export function StarfieldScene({
         const to = starPositionsById.get(segment.toSystemId);
         if (!from || !to) return null;
         return (
-          <Line
+          <AnimatedRouteLine
             key={segment.id}
-            points={[
-              [from.x, from.y, from.z],
-              [to.x, to.y, to.z],
-            ]}
-            color={segment.state === "pre-departure" ? scenePalette.routeDim : scenePalette.route}
-            lineWidth={segment.state === "pre-departure" ? 1.5 : 3}
-            transparent
-            depthTest={false}
-            renderOrder={2}
-            opacity={segment.state === "pre-departure" ? 0.5 : 0.95}
-            dashed={segment.state === "in-transit"}
-            dashSize={0.1}
-            gapSize={0.06}
+            from={from}
+            to={to}
+            state={segment.state}
+            animate={!reducedMotion}
           />
         );
       })}
+
+      <DistanceRings stars={stars} />
 
       <StarPoints stars={stars} onSelectStar={onSelectStar} />
 
