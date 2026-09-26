@@ -731,15 +731,7 @@ function App() {
               </div>
             )}
 
-            {mapMode === "spatial" ? (
-              <SystemDirectory
-                stars={sceneStarNodes}
-                bobs={bobInstances}
-                events={timelineEvents}
-                selectedStarId={activeStar.id}
-                onSelectStar={setSelectedStarId}
-              />
-            ) : null}
+
           </section>
         </section>
 

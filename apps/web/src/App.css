@@ -310,8 +310,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(390px, 0.8fr);
   align-items: end;
-  gap: 40px;
-  padding: 60px 0 38px;
+  gap: 32px;
+  padding: 26px 0 18px;
 }
 
 .intro-copy {
@@ -334,10 +334,10 @@
   margin: 12px 0 16px;
   color: var(--color-text-on-dark);
   font-family: var(--font-heading);
-  font-size: clamp(3.25rem, 6.2vw, 6.2rem);
+  font-size: clamp(1.9rem, 3.4vw, 3.2rem);
   font-weight: 600;
-  letter-spacing: -0.055em;
-  line-height: 0.82;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
 }
 
 .intro-copy h1 em,
@@ -422,7 +422,7 @@
 .atlas-layout {
   display: grid;
   overflow: hidden;
-  grid-template-columns: minmax(270px, 300px) minmax(0, 1fr) minmax(330px, 380px);
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(280px, 320px);
   align-items: start;
   gap: 18px;
 }
@@ -1072,7 +1072,7 @@
 
 .scene-frame {
   position: relative;
-  min-height: clamp(430px, 46vw, 620px);
+  min-height: clamp(560px, 74vh, 980px);
   overflow: hidden;
   border: 1px solid rgba(115, 173, 177, 0.18);
   border-radius: 18px;
@@ -1268,6 +1268,15 @@
   user-select: none;
 }
 
+/* Labels are offset from the marker they name so the system stays visible. */
+.star-label {
+  transform: translateY(30px);
+}
+
+.bob-label {
+  transform: translateY(-24px);
+}
+
 .star-label.selected {
   border-color: rgba(240, 163, 108, 0.64);
   color: #ffe1c5;
@@ -1282,6 +1291,7 @@
 }
 
 .bob-label {
+  transform: translateY(-26px);
   border-color: rgba(240, 163, 108, 0.6);
   color: #ffd4b1;
 }

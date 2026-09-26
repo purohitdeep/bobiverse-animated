@@ -355,6 +355,19 @@ describe("computeSceneFraming", () => {
     expect(framing.radius).toBeCloseTo(2);
   });
 
+  it("keeps the camera far enough back to contain the whole field", () => {
+    // The field is a flat plane, so the bounding sphere over-estimates the
+    // distance needed. It must still be close to a real fit, or systems drop
+    // outside the frame at narrow aspect ratios.
+    const framing = computeSceneFraming([
+      { position: { x: 0, y: 0, z: 0 } },
+      { position: { x: 5, y: 0, z: 0 } },
+    ]);
+    const halfFov = (42 / 2) * (Math.PI / 180);
+    const fitDistance = framing.radius / Math.sin(halfFov);
+    expect(framing.cameraDistance).toBeGreaterThan(fitDistance * 0.8);
+  });
+
   it("keeps fog inside a range that actually spans the star field", () => {
     // A fog range that starts beyond the framing distance hides nothing and
     // reads as a bug; this is the failure the derived range exists to prevent.

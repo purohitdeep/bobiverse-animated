@@ -316,7 +316,7 @@ export function getStarDisplayStyles<T extends { id: string; visualMagnitude?: n
   stars: T[],
   options: StarDisplayOptions = {},
 ): Map<string, StarDisplayStyle> {
-  const { minSize = 0.08, maxSize = 0.3, gamma = 0.5 } = options;
+  const { minSize = 0.17, maxSize = 0.58, gamma = 0.5 } = options;
 
   const magnitudes = stars
     .map((star) => star.visualMagnitude)
@@ -366,8 +366,8 @@ export function buildStarPointAttributes(
   options: StarDisplayOptions = {},
 ): StarPointAttributes {
   const styles = getStarDisplayStyles(stars, options);
-  const minSize = options.minSize ?? 0.08;
-  const maxSize = options.maxSize ?? 0.3;
+  const minSize = options.minSize ?? 0.17;
+  const maxSize = options.maxSize ?? 0.58;
   const fallbackSize = (minSize + maxSize) / 2;
   const positions = new Float32Array(stars.length * 3);
   const colors = new Float32Array(stars.length * 3);
@@ -423,9 +423,9 @@ export interface SceneFraming {
 export interface SceneFramingOptions {
   fovDegrees?: number;
   /**
-   * How much of the viewport half-angle the bounding sphere should occupy.
-   * Below 1 the sphere is comfortably inside the frame rather than touching
-   * the edges, which is what a usable default view needs.
+   * Extra margin on top of the distance at which the bounding sphere exactly
+   * fits the viewport. This must be at least 1: below 1 the camera sits
+   * closer than the field needs and systems fall outside the frame.
    */
   fillFactor?: number;
   minRadius?: number;
@@ -448,7 +448,7 @@ export function computeSceneFraming(
 ): SceneFraming {
   const {
     fovDegrees = 42,
-    fillFactor = 0.6,
+    fillFactor = 0.9,
     minRadius = 1,
     minDistance = 3,
     maxDistance = 26,

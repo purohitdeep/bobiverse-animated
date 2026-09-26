@@ -167,7 +167,6 @@ function DistanceRings({ stars }: { stars: SceneStarNode[] }) {
           key={ly}
           center
           position={[position.x, 0, position.z]}
-          distanceFactor={8}
           zIndexRange={[5, 0]}
         >
           <span className="ring-label">{ly} ly</span>
@@ -254,7 +253,7 @@ function StarPoints({
   stars: SceneStarNode[];
   onSelectStar: (starId: string) => void;
 }) {
-  const { size, viewport, camera } = useThree();
+  const { size, camera, gl } = useThree();
   const attributes = useMemo(() => buildStarPointAttributes(stars), [stars]);
 
   const geometry = useMemo(() => {
@@ -271,7 +270,7 @@ function StarPoints({
   // mutated in place.
   const fovRadians = ((camera as { fov?: number }).fov ?? 42) * (Math.PI / 180);
   const scale =
-    (size.height * viewport.dpr) / (2 * Math.tan(fovRadians / 2));
+    (size.height * gl.getPixelRatio()) / (2 * Math.tan(fovRadians / 2));
 
   const material = useMemo(
     () =>
@@ -359,7 +358,7 @@ function StarLabels({
         // nothing and removes the "what is that unlabelled blob" problem.
         return (
           <group key={star.id} position={[star.position.x, star.position.y, star.position.z]}>
-            <Html center distanceFactor={7}>
+            <Html center zIndexRange={[10, 0]}>
               <div className={isSelected ? "star-label selected" : "star-label"}>
                 <span>{star.name}</span>
                 {eventCount > 0 ? (
@@ -790,13 +789,19 @@ export function StarfieldScene({
   // else moves in while keeping its nearest neighbour in view. Computed after
   // the guard above, so the selected system is known to exist.
   const focusFraming = getFocusFraming(selectedStar, stars, framing);
+  // Every other system lies in one hemisphere of Sol, so centring the
+  // overview on Sol itself leaves half the frame empty. The overview looks
+  // at the field centre instead.
   const focusPose = {
     id: selectedStar.id,
-    position: new Vector3(
-      selectedStar.position.x,
-      selectedStar.position.y,
-      selectedStar.position.z,
-    ),
+    position:
+      selectedStar.id === "sol"
+        ? new Vector3(framing.center.x, framing.center.y, framing.center.z)
+        : new Vector3(
+            selectedStar.position.x,
+            selectedStar.position.y,
+            selectedStar.position.z,
+          ),
     distance: focusFraming.distance,
     minDistance: focusFraming.minDistance,
     maxDistance: focusFraming.maxDistance,
@@ -935,12 +940,6 @@ export function StarfieldScene({
         maxPolarAngle={1.25}
       />
       </Canvas>
-      <SchematicOverlay
-        stars={stars}
-        travelSegments={travelSegments}
-        bobs={bobs}
-        selectedStarId={selectedStarId}
-      />
     </>
   );
 }

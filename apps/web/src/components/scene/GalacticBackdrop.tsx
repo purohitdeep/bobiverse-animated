@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from "react";
 import {
   AdditiveBlending,
+  BackSide,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
-  DoubleSide,
   PointsMaterial,
   SRGBColorSpace,
 } from "three";
@@ -35,18 +35,18 @@ function createBandTexture(seed: number) {
 
   // Soft luminous clouds concentrated along the band, thickest at the middle
   // of the plane and thinning towards the galactic poles.
-  for (let i = 0; i < 900; i++) {
+  for (let i = 0; i < 1400; i++) {
     const x = random() * canvas.width;
     // Gaussian-ish concentration around the midline.
     const t = (random() + random() + random() - 1.5) / 1.5;
     const y = canvas.height / 2 + t * canvas.height * 0.42;
 
-    const radius = 18 + random() * 70;
-    const brightness = Math.max(0, 1 - Math.abs(t)) * (0.05 + random() * 0.12);
+    const radius = 40 + random() * 130;
+    const brightness = Math.max(0, 1 - Math.abs(t)) * (0.08 + random() * 0.16);
 
     const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-    gradient.addColorStop(0, `rgba(206, 214, 235, ${brightness})`);
-    gradient.addColorStop(1, "rgba(206, 214, 235, 0)");
+    gradient.addColorStop(0, `rgba(198, 210, 238, ${brightness})`);
+    gradient.addColorStop(1, "rgba(198, 210, 238, 0)");
     context.fillStyle = gradient;
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
@@ -130,28 +130,32 @@ export function GalacticBackdrop({
 
   return (
     <group>
-      {/* Distant field of faint stars, well outside the catalog systems. */}
+      {/* The galactic plane, wrapped around the whole scene. A flat plane
+          was a mistake: the camera orbits inside a few units of the origin,
+          so any near plane filled the frame. A surrounding sphere keeps the
+          band at a constant, distant depth however the reader orbits. */}
+      <mesh renderOrder={-10}>
+        <sphereGeometry args={[fieldRadius * 24, 32, 24]} />
+        <meshBasicMaterial
+          map={bandTexture}
+          side={BackSide}
+          transparent
+          opacity={0.7}
+          depthWrite={false}
+          // Drawn first and never tested against depth, so it can only ever
+          // sit behind the atlas content.
+          depthTest={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Distant field of faint stars, outside the band but inside the sky. */}
       <points
         geometry={deepField}
         material={fieldMaterial}
         frustumCulled={false}
         renderOrder={-2}
       />
-
-      {/* The galactic plane, tilted off the ecliptic so it reads as a band
-          across the sky rather than an edge-on line. */}
-      <mesh rotation={[Math.PI / 2 - 0.38, 0, 0.42]} renderOrder={-3}>
-        <planeGeometry args={[fieldRadius * 14, fieldRadius * 7]} />
-        <meshBasicMaterial
-          map={bandTexture}
-          transparent
-          opacity={0.5}
-          depthWrite={false}
-          side={DoubleSide}
-          blending={AdditiveBlending}
-          toneMapped={false}
-        />
-      </mesh>
     </group>
   );
 }
